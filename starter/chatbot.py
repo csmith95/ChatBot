@@ -17,6 +17,8 @@ from random import randint
 class Chatbot:
     """Simple class to implement the chatbot for PA 6."""
 
+    global binarize
+
     #############################################################################
     # `moviebot` is the default chatbot. Change it to your chatbot's name       #
     #############################################################################
@@ -24,6 +26,8 @@ class Chatbot:
       self.name = 'Rudolfa'
       self.is_turbo = is_turbo
       self.read_data()
+      self.mean_center()
+      
 
     #############################################################################
     # 1. WARM UP REPL
@@ -94,14 +98,22 @@ class Chatbot:
       reader = csv.reader(open('data/sentiment.txt', 'rb'))
       self.sentiment = dict(reader)
 
+    def mean_center(self):
+      for user, ratingMap in self.ratings.iteritems():
+        mean = sum(ratingMap.values()) / float(len(ratingMap.values()))
+        self.ratings[user] = {movie: binarize(rating, mean) for movie, rating in ratingMap.iteritems()}
 
-    def binarize(self):
+    def binarize(rating, mean):
       """Modifies the ratings matrix to make all of the ratings binary"""
+      result = rating - mean
+      if result > 0.0:
+        return 1
+      elif result < 0.0:
+        return -1
+      return 0
 
-      pass
 
-
-    def distance(self, u, v):
+    def sim(self, u, v):
       """Calculates a given distance function between vectors u and v"""
       # TODO: Implement the distance function between vectors u and v]
       # Note: you can also think of this as computing a similarity measure
