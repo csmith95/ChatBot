@@ -8,11 +8,12 @@
 ######################################################################
 import csv
 import math
-
+import re
 import numpy as np
 
 from movielens import ratings
 from random import randint
+from PorterStemmer import PorterStemmer
 
 class Chatbot:
     """Simple class to implement the chatbot for PA 6."""
@@ -24,6 +25,7 @@ class Chatbot:
       self.name = 'Rudolfa'
       self.is_turbo = is_turbo
       self.read_data()
+      self.p = PorterStemmer()
 
     #############################################################################
     # 1. WARM UP REPL
@@ -48,15 +50,18 @@ class Chatbot:
       #############################################################################
       # TODO: Write a short farewell message                                      #
       #############################################################################
-
-      goodbye_message = 'Catch ya later alligator ;)'
+      r = random.randomInt(0,1)
+      messages = {
+        0 : 'See ya in a while crocodile :*',
+        1 : 'Catch ya later alligator ;)'
+      }
+      goodbye_message = messages[r]
 
       #############################################################################
       #                             END OF YOUR CODE                              #
       #############################################################################
 
       return goodbye_message
-
 
     #############################################################################
     # 2. Modules 2 and 3: extraction and transformation                         #
@@ -73,12 +78,48 @@ class Chatbot:
       # calling other functions. Although modular code is not graded, it is       #
       # highly recommended                                                        #
       #############################################################################
+      movieTitles = [] #List of movie titles included in double quotations
+      sentimentDict = [] #Dictionary of words in input that have an associated sentiment
+      movieTitles = self.extractMovies(input)
+      sentimentWords = self.extractSentiment(input)
+
+      print movieTitles
+      print sentimentWords
+
       if self.is_turbo == True:
         response = 'processed %s in creative mode!!' % input
       else:
         response = 'processed %s in starter mode' % input
 
       return response
+
+    def extractMovies(self, input) :
+        return re.findall(r'\"(.+?)\"', input)
+
+    def extractSentiment(self, input, src_file='data/sentiment.txt') :
+        tokens = input.split()
+        tokenSet = set(tokens)
+        sentimentDict = self.sentiments(src_file, ',', csv.QUOTE_MINIMAL)
+        tokensSentimentDict = {}
+        for word in tokens:
+            word = self.p.stem(word)
+            if word in sentimentDict:
+                tokensSentimentDict[word] = sentimentDict[word]
+        return tokensSentimentDict
+
+    def sentiments(self, src_file, delimiter, quoting):
+        reader = csv.reader(file(src_file), delimiter=delimiter, quoting=quoting)
+        sentimentDict = {}
+        for line in reader:
+            word, sent = line[0], line[1]
+            word = self.p.stem(word)
+            sentimentDict[word] = sent
+        return sentimentDict
+
+
+
+
+
 
 
     #############################################################################
