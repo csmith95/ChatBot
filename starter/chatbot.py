@@ -63,7 +63,7 @@ class Chatbot:
     #############################################################################
 
     def process(self, input):
-      """Takess the input string from the REPL and call delegated functions
+      """Takes the input string from the REPL and call delegated functions
       that
         1) extract the relevant information and
         2) transform the information into a response to the user
