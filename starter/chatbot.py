@@ -21,7 +21,7 @@ class Chatbot:
     # `moviebot` is the default chatbot. Change it to your chatbot's name       #
     #############################################################################
     def __init__(self, is_turbo=False):
-      self.name = 'moviebot'
+      self.name = 'Rudolfa'
       self.is_turbo = is_turbo
       self.read_data()
 
@@ -35,7 +35,7 @@ class Chatbot:
       # TODO: Write a short greeting message                                      #
       #############################################################################
 
-      greeting_message = 'How can I help you?'
+      greeting_message = 'Suh dude.'
 
       #############################################################################
       #                             END OF YOUR CODE                              #
@@ -49,7 +49,7 @@ class Chatbot:
       # TODO: Write a short farewell message                                      #
       #############################################################################
 
-      goodbye_message = 'Have a nice day!'
+      goodbye_message = 'Catch ya later alligator ;)'
 
       #############################################################################
       #                             END OF YOUR CODE                              #
