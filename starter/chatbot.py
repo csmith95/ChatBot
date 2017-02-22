@@ -29,9 +29,8 @@ class Chatbot:
       self.read_data()
       self.mean_center()
       self.p = PorterStemmer()
-      self.sentimentDict = {} #movie to +/- , like/dislike
-    #   self.movieTitles = self.titles()
-      self.titleDict = {} #Movie ID to title
+      self.sentimentDict = {} #movie to +/-1 , like/dislike
+      self.titleDict = self.createTitleDict() #Movie ID to [title, genre]
 
     #############################################################################
     # 1. WARM UP REPL
@@ -79,27 +78,12 @@ class Chatbot:
         1) extract the relevant information and
         2) transform the information into a response to the user
       """
-      #############################################################################
-      # TODO: Implement the extraction and transformation in this method, possibly#
-      # calling other functions. Although modular code is not graded, it is       #
-      # highly recommended                                                        #
-      #############################################################################
+      input = input.lower()
+      self.updateSentimentDict(input)
+      inputtedMoviesInfo = [] #Returns list of [movie id, genre|genre]
+      inputtedMoviesInfo = self.returnIdsTitlesGenres(self.extractMovies(input))
 
-    #   movieTitles = [] #List of movie titles included in double quotations
-    #   sentimentDict = {} #Dictionary of words in input that have an associated sentiment
-    #   movieTitles = self.extractMovies(input)
-      self.titleDict.update(self.extractMovies(input))
-      self.sentimentDict.update(self.extractSentiment(input))
-      movieTitles = [] #List of movie titles included in double quotations
-      sentimentWords = [] #Dictionary of words in input that have an associated sentiment
-      movieTitles += self.extractMovies(input)
-      sentimentWords += self.extractSentiment(input)
-
-
-    #   print movieTitles
-    #   print sentimentWords
-    #   moviesAndGenres = []
-    #   moviesAndGenres = self.returnMoviesAndGenres(movieTitles)
+      print inputtedMoviesInfo
 
       if len(movieTitles) == 5:
         self.recommend()
@@ -111,16 +95,11 @@ class Chatbot:
 
       return ""
 
-    # Returns dict from movie ID to title
+    # Returns list of movies entered in input
     def extractMovies(self, input) :
-        # inputTitles = re.findall(r'\"(.+?)\"', input)
-
-        # for title in inputTitles:
-        #     if title
-
         return re.findall(r'\"(.+?)\"', input)
 
-    # Returns dict from Movie ID to +/-1 (user given sentiment)
+    # Returns dict from input words to sentiments pos/neg
     def extractSentiment(self, input, src_file='data/sentiment.txt') :
         tokens = input.split()
         tokenSet = set(tokens)
@@ -132,6 +111,7 @@ class Chatbot:
                 tokensSentimentDict[word] = sentimentDict[word]
         return tokensSentimentDict
 
+    # Returns sentiment.txt in dict form
     def sentiments(self, src_file, delimiter, quoting):
         reader = csv.reader(file(src_file), delimiter=delimiter, quoting=quoting)
         sentimentDict = {}
@@ -141,37 +121,74 @@ class Chatbot:
             sentimentDict[word] = sent
         return sentimentDict
 
-    # def titles(self):
-    #     titles = []
-    #     self.titles1, self.ratings = ratings()
-    #     for movie in self.titles1:
-    #         found = re.findall(regexTitle, movie[0])
-    #         title = found[0][0]
-    #         #eliminate trailing space
-    #         titles.append(title)
-    #         print title +'@'
-    #     return titles
+    #Returns dict of movie ID to [title w/o year, genre]
+    def createTitleDict(self):
+        self.titles1, self.ratings = ratings()
+        #Regex currently doesnt handle parenthesis in title.
+            # Ex. "(500) Days of Summer"
+        regexTitle = '([\w\s\',:\&¡!\*\]\[\$.-]*)(\s\(.*)?'
+        titlesGenres = []
+        for movie in self.titles1: # Create list of movie titles
+            # print movie[1]
+            found = re.findall(regexTitle, movie[0], re.UNICODE)
+            title = found[0][0].lower()
+            length = len(title)
+            if length != 0:
+                if title[length - 1] == " ":
+                    title = title[:-1]
+                titlesGenres.append([title, movie[1]])
+            else:
+                titlesGenres.append([movie[0], movie[1]])
+                print "PROBLEM MOVIE:"
+                print movie
+                print "Appending:"
+                print movie[0]
+                print movie[1]
 
-    # def returnMoviesAndGenres(self, movieTitles): # Returns references to movies in movies.txt
-    #     self.titles, self.ratings = ratings()  #Single title: [movieID, title, genres]
-    #     # movieTitles = set(movieTitles)
-    #     movieAndGenres = []
-    #     regexTitle = '([\w\s\',:\&¡!.-]*)(\s\(.*)?'
-    #     for movie in self.titles:
-    #         found = re.findall(regexTitle, movie[0])
-    #         title = found[0][0]
-    #         # print movie
-    #         length = len(title)
-    #         if title[length - 1] == " ":
-    #             title = title[:-1]
-    #         print title + "@"
-    #     #     if title[0] in movieTitles:
-    #     #         print movie
-    #     #         movieAndGenres.append(movie)
-    #     #         movieTitles.remove(movie[0])
-    #     # for movieLeftOver in movieTitles:
-    #     #     print "Did not recognize the movie " + movieLeftOver
-    #     return movieAndGenres
+        idToTitleDict = {}
+        for i, movie in enumerate(self.titles):
+            idToTitleDict[i] = titlesGenres[i]
+        return idToTitleDict
+
+    #Classifies input as overall positive or negative and stores that in dict with movie ID
+    def updateSentimentDict(self, input):
+        binarySent = self.binarizeInputSentiment(input)
+        for inputTitle in self.extractMovies(input):
+            for id, title in self.titleDict.iteritems():
+                if title == inputTitle: #What if movie is already in sentDict??
+                    self.sentimentDict[id] = binarySent
+
+    #Takes input, looks at sentiment words, computes overall sentiment based on
+    #whether there are mor pos or neg words. returns pos if tie
+    def binarizeInputSentiment(self, input):
+        inputSentDict = {}
+        inputSentDict = self.extractSentiment(input)
+        negSum = 0
+        posSum = 0
+        for word in inputSentDict:
+            if inputSentDict[word] == 'pos':
+                posSum = posSum + 1
+            else:
+                negSum = negSum + 1
+        if negSum > posSum:
+            return -1
+        else:
+            return 1
+
+    #Returns list of [movie IDs, title, genre|genre]
+    #If movie not found, [NOT_FOUND] appended instead
+    def returnIdsTitlesGenres(self, inputTitles):
+        movieInfo = []
+        for inputTitle in inputTitles:
+            for id, info in self.titleDict.iteritems():
+                if info[0] == inputTitle:
+                    movieInfo.append([id, info[0], info[1]])
+                    break
+                if id == len(self.titleDict) - 1:
+                    movieInfo.append(["NOT_FOUND"])
+        return movieInfo
+
+
 
 
     #############################################################################
