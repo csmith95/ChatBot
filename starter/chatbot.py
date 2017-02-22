@@ -73,26 +73,45 @@ class Chatbot:
     #############################################################################
 
     def process(self, input):
-      """Takes the input string from the REPL and call delegated functions
-      that
+        """Takes the input string from the REPL and call delegated functions
+        that
         1) extract the relevant information and
         2) transform the information into a response to the user
-      """
-      input = input.lower()
-      self.updateSentimentDict(input)
-      inputtedMoviesInfo = [] #Returns list of [movie id, title, genre|genre]
-      inputtedMoviesInfo = self.returnIdsTitlesGenres(self.extractMovies(input))
-      
-      if len(self.sentimentDict) == 5:
-        print 'rec: ', self.recommend(self.sentimentDict)
-        # return ', '.join(self.recommend(self.sentimentDict))
+        """
+        mode = '(starter) '
+        if self.is_turbo == True:
+            mode = '(creative) '
 
-      if self.is_turbo == True:
-        response = 'processed %s in creative mode!!' % input
-      else:
-        response = 'processed %s in starter mode' % input
+        input = input.lower()
+        self.updateSentimentDict(input)
+        inputtedMoviesInfo = [] #Returns list of [movie id, title, genre|genre]
+        inputtedMoviesInfo = self.returnIdsTitlesGenres(self.extractMovies(input))
 
-      return response
+        #user hasnt entered 5 movies yet
+        if len(self.sentimentDict) < 5:
+            request = 'Another one.'
+            confirm = 'Dats coo. '
+            if len(self.sentimentDict) == 0: #first movie from user
+                request = 'Please tell me about a movie you liked or didn\'t like.'
+                confirm = ''
+            response = mode + confirm + request
+        else:
+            response = 'I recommend: ', self.recommend(self.sentimentDict)
+            # return ', '.join(self.recommend(self.sentimentDict))
+
+        #user enters no movie titles in quotes
+        if len(inputtedMoviesInfo) == 0:
+            response = mode + 'Please tell me about a movie. Remember to use double quotes around its title.'
+        #user enters a title not in movies.txt
+        if ['NOT_FOUND'] in inputtedMoviesInfo:
+            response = mode + 'Don\'t think I know that movie. Please try telling me about a different one.'
+
+        #   if self.is_turbo == True:
+        #     response = 'processed %s in creative mode!!' % input
+        #   else:
+        #     response = 'processed %s in starter mode' % input
+
+        return response
 
     # Returns list of movies entered in input
     def extractMovies(self, input) :
@@ -157,7 +176,7 @@ class Chatbot:
     def updateSentimentDict(self, input):
         binarySent = self.binarizeInputSentiment(input)
         for inputTitle in self.extractMovies(input):
-          print inputTitle
+        #   print inputTitle
           for id, title in self.titleDict.iteritems():
               if title[0] == inputTitle: #What if movie is already in sentDict??
                   self.sentimentDict[id] = binarySent
@@ -238,7 +257,7 @@ class Chatbot:
     def recommend(self, u):
       """Generates a list of movies based on the input vector u using
       collaborative filtering"""
-      
+
       match = None
       score = 0.0
       i = None
@@ -253,7 +272,7 @@ class Chatbot:
       unseenMovies = set(ratingMap.keys()).difference(set(u.keys()))
       print 'user: ', i
       return [movie for movie in unseenMovies if ratingMap[movie] > 0]
-        
+
 
     #############################################################################
     # 4. Debug info                                                             #
