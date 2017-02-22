@@ -83,10 +83,11 @@ class Chatbot:
       inputtedMoviesInfo = [] #Returns list of [movie id, title, genre|genre]
       inputtedMoviesInfo = self.returnIdsTitlesGenres(self.extractMovies(input))
 
-      print inputtedMoviesInfo
+    #   for movie in self.titleDict:
+    #       print self.titleDict[movie]
 
-      if len(movieTitles) == 5:
-        self.recommend()
+    #   if len(movieTitles) == 5:
+    #     self.recommend()
 
       # if self.is_turbo == True:
       #   response = 'processed %s in creative mode!!' % input
@@ -130,11 +131,13 @@ class Chatbot:
         titlesGenres = []
         for movie in self.titles1: # Create list of movie titles
             found = re.findall(regexTitle, movie[0], re.UNICODE)
-            title = found[0][0].lower()
+            title = found[0][0].lower().strip()
+            if ', the' in title:
+                title = self.fixTheIssue(title)
             length = len(title)
             if length != 0:
-                if title[length - 1] == " ":
-                    title = title[:-1]
+                # if title[length - 1] == " ":
+                #     title = title[:-1]
                 titlesGenres.append([title, movie[1]])
             else:
                 titlesGenres.append([movie[0], movie[1]])
@@ -143,6 +146,14 @@ class Chatbot:
         for i, movie in enumerate(self.titles):
             idToTitleDict[i] = titlesGenres[i]
         return idToTitleDict
+
+    # Ex. 'big short, the'
+    def fixTheIssue(self, title):
+        length = len(title)
+        l = length - 5
+        if title[l:] == ', the':
+            title = 'the ' + title[:-5]
+        return title
 
     #Classifies input as overall positive or negative and stores that in dict with movie ID
     def updateSentimentDict(self, input):
