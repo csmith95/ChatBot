@@ -77,9 +77,11 @@ class Chatbot:
       """
       input = input.lower()
       self.updateSentimentDict(input)
+    #   print self.titleDict
+      inputtedMoviesInfo = [] #Returns list of [movie id, genre|genre]
+      inputtedMoviesInfo = self.returnIdsTitlesGenres(self.extractMovies(input))
 
-    #   moviesAndGenres = []
-    #   moviesAndGenres = self.returnMoviesAndGenres(self.extractMovies(input))
+      print inputtedMoviesInfo
 
       if self.is_turbo == True:
         response = 'processed %s in creative mode!!' % input
@@ -119,21 +121,28 @@ class Chatbot:
         self.titles1, self.ratings = ratings()
         #Regex currently doesnt handle parenthesis in title.
             # Ex. "(500) Days of Summer"
-        regexTitle = '([\w\s\',:\&¡!\*\]\[.-]*)(\s\(.*)?'
-        titles = []
+        regexTitle = '([\w\s\',:\&¡!\*\]\[\$.-]*)(\s\(.*)?'
+        titlesGenres = []
         for movie in self.titles1: # Create list of movie titles
-            # print movie
+            # print movie[1]
             found = re.findall(regexTitle, movie[0], re.UNICODE)
             title = found[0][0].lower()
             length = len(title)
             if length != 0:
                 if title[length - 1] == " ":
                     title = title[:-1]
-                titles.append(title)
+                titlesGenres.append([title, movie[1]])
+            else:
+                titlesGenres.append([movie[0], movie[1]])
+                print "PROBLEM MOVIE:"
+                print movie
+                print "Appending:"
+                print movie[0]
+                print movie[1]
 
         idToTitleDict = {}
-        for i, movie in enumerate(titles):
-            idToTitleDict[i] = titles[i]
+        for i, movie in enumerate(self.titles):
+            idToTitleDict[i] = titlesGenres[i]
         return idToTitleDict
 
     #Classifies input as overall positive or negative and stores that in dict with movie ID
@@ -161,27 +170,20 @@ class Chatbot:
         else:
             return 1
 
+    #Returns list of [movie IDs, title, genre|genre]
+    #If movie not found, [NOT_FOUND] appended instead
+    def returnIdsTitlesGenres(self, inputTitles):
+        movieInfo = []
+        for inputTitle in inputTitles:
+            for id, info in self.titleDict.iteritems():
+                if info[0] == inputTitle:
+                    movieInfo.append([id, info[0], info[1]])
+                    break
+                if id == len(self.titleDict) - 1:
+                    movieInfo.append(["NOT_FOUND"])
+        return movieInfo
 
-    # def returnMoviesAndGenres(self, movieTitles): # Returns references to movies in movies.txt
-    #     self.titles, self.ratings = ratings()  #Single title: [movieID, title, genres]
-    #     # movieTitles = set(movieTitles)
-    #     movieAndGenres = []
-    #     regexTitle = '([\w\s\',:\&¡!.-]*)(\s\(.*)?'
-    #     for movie in self.titles:
-    #         found = re.findall(regexTitle, movie[0])
-    #         title = found[0][0]
-    #         # print movie
-    #         length = len(title)
-    #         if title[length - 1] == " ":
-    #             title = title[:-1]
-    #         print title + "@"
-    #     #     if title[0] in movieTitles:
-    #     #         print movie
-    #     #         movieAndGenres.append(movie)
-    #     #         movieTitles.remove(movie[0])
-    #     # for movieLeftOver in movieTitles:
-    #     #     print "Did not recognize the movie " + movieLeftOver
-    #     return movieAndGenres
+
 
 
 
