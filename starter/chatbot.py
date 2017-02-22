@@ -82,19 +82,22 @@ class Chatbot:
       # highly recommended                                                        #
       #############################################################################
       movieTitles = [] #List of movie titles included in double quotations
-      sentimentDict = [] #Dictionary of words in input that have an associated sentiment
-      movieTitles = self.extractMovies(input)
-      sentimentWords = self.extractSentiment(input)
+      sentimentWords = [] #Dictionary of words in input that have an associated sentiment
+      movieTitles += self.extractMovies(input)
+      sentimentWords += self.extractSentiment(input)
 
       print movieTitles
       print sentimentWords
 
-      if self.is_turbo == True:
-        response = 'processed %s in creative mode!!' % input
-      else:
-        response = 'processed %s in starter mode' % input
+      if len(movieTitles) == 5:
+        self.recommend()
 
-      return response
+      # if self.is_turbo == True:
+      #   response = 'processed %s in creative mode!!' % input
+      # else:
+      #   response = 'processed %s in starter mode' % input
+
+      return ""
 
     def extractMovies(self, input) :
         return re.findall(r'\"(.+?)\"', input)
@@ -118,11 +121,6 @@ class Chatbot:
             word = self.p.stem(word)
             sentimentDict[word] = sent
         return sentimentDict
-
-
-
-
-
 
 
     #############################################################################
@@ -155,10 +153,20 @@ class Chatbot:
 
     def sim(self, u, v):
       """Calculates a given distance function between vectors u and v"""
-      # TODO: Implement the distance function between vectors u and v]
-      # Note: you can also think of this as computing a similarity measure
+      commonMovies = set(u.keys()).union(set(v).keys())
+      meanU = sum(u.values()) / float(len(u.values()))
+      meanV = sum(v.values()) / float(len(v.values()))
+      deviationU = 0.0
+      deviationV = 0.0
+      stdU = 0.0
+      stdV = 0.0
+      for movie in commonMovies:
+        deviationU += u[movie] - meanU
+        deviationV = v[movie] - meanV
+        stdU += (u[movie] - meanU)**2
+        stdV += (v[movie] - meanV)**2
 
-      pass
+      return (deviationU * deviationV) / sqrt(stdU * stdV)  
 
 
     def recommend(self, u):
@@ -166,6 +174,7 @@ class Chatbot:
       collaborative filtering"""
       # TODO: Implement a recommendation function that takes a user vector u
       # and outputs a list of movies recommended by the chatbot
+      
 
       pass
 
