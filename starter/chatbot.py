@@ -88,6 +88,12 @@ class Chatbot:
       if len(movieTitles) == 5:
         self.recommend()
 
+      print movieTitles
+      print sentimentWords
+      
+      if True: #len(movieTitles) == 5:
+        self.recommend(self.sentimentDict)
+
       # if self.is_turbo == True:
       #   response = 'processed %s in creative mode!!' % input
       # else:
@@ -240,12 +246,19 @@ class Chatbot:
     def recommend(self, u):
       """Generates a list of movies based on the input vector u using
       collaborative filtering"""
-      # TODO: Implement a recommendation function that takes a user vector u
-      # and outputs a list of movies recommended by the chatbot
+      
+      match = None
+      score = 0.0
+      for user, ratingMap in self.ratings:
+        sim = self.sim(u, ratingMap)
+        if sim > score:
+          score = sim
+          match = ratingMap
 
 
-      pass
-
+      unseenMovies = set(ratingMap.keys()).difference(u.keys())
+      return [movie for movie in unseenMovies if ratingMap[movie] > 0]
+        
 
     #############################################################################
     # 4. Debug info                                                             #
