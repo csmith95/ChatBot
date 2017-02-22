@@ -18,6 +18,8 @@ from PorterStemmer import PorterStemmer
 class Chatbot:
     """Simple class to implement the chatbot for PA 6."""
 
+    global binarize
+
     #############################################################################
     # `moviebot` is the default chatbot. Change it to your chatbot's name       #
     #############################################################################
@@ -25,6 +27,7 @@ class Chatbot:
       self.name = 'Rudolfa'
       self.is_turbo = is_turbo
       self.read_data()
+      self.mean_center()
       self.p = PorterStemmer()
       self.sentimentDict = {} #movie to +/- , like/dislike
     #   self.movieTitles = self.titles()
@@ -81,23 +84,32 @@ class Chatbot:
       # calling other functions. Although modular code is not graded, it is       #
       # highly recommended                                                        #
       #############################################################################
+
     #   movieTitles = [] #List of movie titles included in double quotations
     #   sentimentDict = {} #Dictionary of words in input that have an associated sentiment
     #   movieTitles = self.extractMovies(input)
       self.titleDict.update(self.extractMovies(input))
       self.sentimentDict.update(self.extractSentiment(input))
+      movieTitles = [] #List of movie titles included in double quotations
+      sentimentWords = [] #Dictionary of words in input that have an associated sentiment
+      movieTitles += self.extractMovies(input)
+      sentimentWords += self.extractSentiment(input)
+
 
     #   print movieTitles
     #   print sentimentWords
     #   moviesAndGenres = []
     #   moviesAndGenres = self.returnMoviesAndGenres(movieTitles)
 
-      if self.is_turbo == True:
-        response = 'processed %s in creative mode!!' % input
-      else:
-        response = 'processed %s in starter mode' % input
+      if len(movieTitles) == 5:
+        self.recommend()
 
-      return response
+      # if self.is_turbo == True:
+      #   response = 'processed %s in creative mode!!' % input
+      # else:
+      #   response = 'processed %s in starter mode' % input
+
+      return ""
 
     # Returns dict from movie ID to title
     def extractMovies(self, input) :
@@ -162,11 +174,6 @@ class Chatbot:
     #     return movieAndGenres
 
 
-
-
-
-
-
     #############################################################################
     # 3. Movie Recommendation helper functions                                  #
     #############################################################################
@@ -180,19 +187,37 @@ class Chatbot:
       reader = csv.reader(open('data/sentiment.txt', 'rb'))
       self.sentiment = dict(reader)
 
+    def mean_center(self):
+      for user, ratingMap in self.ratings.iteritems():
+        mean = sum(ratingMap.values()) / float(len(ratingMap.values()))
+        self.ratings[user] = {movie: binarize(rating, mean) for movie, rating in ratingMap.iteritems()}
 
-    def binarize(self):
+    def binarize(rating, mean):
       """Modifies the ratings matrix to make all of the ratings binary"""
+      result = rating - mean
+      if result > 0.0:
+        return 1
+      elif result < 0.0:
+        return -1
+      return 0
 
-      pass
 
-
-    def distance(self, u, v):
+    def sim(self, u, v):
       """Calculates a given distance function between vectors u and v"""
-      # TODO: Implement the distance function between vectors u and v]
-      # Note: you can also think of this as computing a similarity measure
+      commonMovies = set(u.keys()).union(set(v).keys())
+      meanU = sum(u.values()) / float(len(u.values()))
+      meanV = sum(v.values()) / float(len(v.values()))
+      deviationU = 0.0
+      deviationV = 0.0
+      stdU = 0.0
+      stdV = 0.0
+      for movie in commonMovies:
+        deviationU += u[movie] - meanU
+        deviationV = v[movie] - meanV
+        stdU += (u[movie] - meanU)**2
+        stdV += (v[movie] - meanV)**2
 
-      pass
+      return (deviationU * deviationV) / sqrt(stdU * stdV)
 
 
     def recommend(self, u):
@@ -200,6 +225,7 @@ class Chatbot:
       collaborative filtering"""
       # TODO: Implement a recommendation function that takes a user vector u
       # and outputs a list of movies recommended by the chatbot
+
 
       pass
 
