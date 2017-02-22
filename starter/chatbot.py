@@ -129,7 +129,6 @@ class Chatbot:
         regexTitle = '([\w\s\',:\&¡!\*\]\[\$.-]*)(\s\(.*)?'
         titlesGenres = []
         for movie in self.titles1: # Create list of movie titles
-            # print movie[1]
             found = re.findall(regexTitle, movie[0], re.UNICODE)
             title = found[0][0].lower()
             length = len(title)
@@ -139,11 +138,6 @@ class Chatbot:
                 titlesGenres.append([title, movie[1]])
             else:
                 titlesGenres.append([movie[0], movie[1]])
-                print "PROBLEM MOVIE:"
-                print movie
-                print "Appending:"
-                print movie[0]
-                print movie[1]
 
         idToTitleDict = {}
         for i, movie in enumerate(self.titles):
