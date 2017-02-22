@@ -18,6 +18,8 @@ from PorterStemmer import PorterStemmer
 class Chatbot:
     """Simple class to implement the chatbot for PA 6."""
 
+    global binarize
+
     #############################################################################
     # `moviebot` is the default chatbot. Change it to your chatbot's name       #
     #############################################################################
@@ -25,6 +27,7 @@ class Chatbot:
       self.name = 'Rudolfa'
       self.is_turbo = is_turbo
       self.read_data()
+      self.mean_center()
       self.p = PorterStemmer()
       self.sentimentDict = {} #movie to +/-1 , like/dislike
       self.titleDict = self.createTitleDict() #Movie ID to [title, genre]
@@ -77,18 +80,20 @@ class Chatbot:
       """
       input = input.lower()
       self.updateSentimentDict(input)
-    #   print self.titleDict
       inputtedMoviesInfo = [] #Returns list of [movie id, genre|genre]
       inputtedMoviesInfo = self.returnIdsTitlesGenres(self.extractMovies(input))
 
       print inputtedMoviesInfo
 
-      if self.is_turbo == True:
-        response = 'processed %s in creative mode!!' % input
-      else:
-        response = 'processed %s in starter mode' % input
+      if len(movieTitles) == 5:
+        self.recommend()
 
-      return response
+      # if self.is_turbo == True:
+      #   response = 'processed %s in creative mode!!' % input
+      # else:
+      #   response = 'processed %s in starter mode' % input
+
+      return ""
 
     # Returns list of movies entered in input
     def extractMovies(self, input) :
@@ -186,11 +191,6 @@ class Chatbot:
 
 
 
-
-
-
-
-
     #############################################################################
     # 3. Movie Recommendation helper functions                                  #
     #############################################################################
@@ -204,19 +204,37 @@ class Chatbot:
       reader = csv.reader(open('data/sentiment.txt', 'rb'))
       self.sentiment = dict(reader)
 
+    def mean_center(self):
+      for user, ratingMap in self.ratings.iteritems():
+        mean = sum(ratingMap.values()) / float(len(ratingMap.values()))
+        self.ratings[user] = {movie: binarize(rating, mean) for movie, rating in ratingMap.iteritems()}
 
-    def binarize(self):
+    def binarize(rating, mean):
       """Modifies the ratings matrix to make all of the ratings binary"""
+      result = rating - mean
+      if result > 0.0:
+        return 1
+      elif result < 0.0:
+        return -1
+      return 0
 
-      pass
 
-
-    def distance(self, u, v):
+    def sim(self, u, v):
       """Calculates a given distance function between vectors u and v"""
-      # TODO: Implement the distance function between vectors u and v]
-      # Note: you can also think of this as computing a similarity measure
+      commonMovies = set(u.keys()).union(set(v).keys())
+      meanU = sum(u.values()) / float(len(u.values()))
+      meanV = sum(v.values()) / float(len(v.values()))
+      deviationU = 0.0
+      deviationV = 0.0
+      stdU = 0.0
+      stdV = 0.0
+      for movie in commonMovies:
+        deviationU += u[movie] - meanU
+        deviationV = v[movie] - meanV
+        stdU += (u[movie] - meanU)**2
+        stdV += (v[movie] - meanV)**2
 
-      pass
+      return (deviationU * deviationV) / sqrt(stdU * stdV)
 
 
     def recommend(self, u):
@@ -224,6 +242,7 @@ class Chatbot:
       collaborative filtering"""
       # TODO: Implement a recommendation function that takes a user vector u
       # and outputs a list of movies recommended by the chatbot
+
 
       pass
 
