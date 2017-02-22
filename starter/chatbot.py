@@ -83,23 +83,20 @@ class Chatbot:
       inputtedMoviesInfo = [] #Returns list of [movie id, genre|genre]
       inputtedMoviesInfo = self.returnIdsTitlesGenres(self.extractMovies(input))
 
-      print inputtedMoviesInfo
-
-      if len(movieTitles) == 5:
-        self.recommend()
-
-      print movieTitles
-      print sentimentWords
+      # print inputtedMoviesInfo
+      # print sentimentWords
       
-      if True: #len(movieTitles) == 5:
-        self.recommend(self.sentimentDict)
+      print len(self.sentimentDict)
+      if len(self.sentimentDict) == 5:
+        print 'rec: ', self.recommend(self.sentimentDict)
+        # return ', '.join(self.recommend(self.sentimentDict))
 
-      # if self.is_turbo == True:
-      #   response = 'processed %s in creative mode!!' % input
-      # else:
-      #   response = 'processed %s in starter mode' % input
+      if self.is_turbo == True:
+        response = 'processed %s in creative mode!!' % input
+      else:
+        response = 'processed %s in starter mode' % input
 
-      return ""
+      return response
 
     # Returns list of movies entered in input
     def extractMovies(self, input) :
@@ -160,9 +157,10 @@ class Chatbot:
     def updateSentimentDict(self, input):
         binarySent = self.binarizeInputSentiment(input)
         for inputTitle in self.extractMovies(input):
-            for id, title in self.titleDict.iteritems():
-                if title == inputTitle: #What if movie is already in sentDict??
-                    self.sentimentDict[id] = binarySent
+          print inputTitle
+          for id, title in self.titleDict.iteritems():
+              if title[0] == inputTitle: #What if movie is already in sentDict??
+                  self.sentimentDict[id] = binarySent
 
     #Takes input, looks at sentiment words, computes overall sentiment based on
     #whether there are mor pos or neg words. returns pos if tie
@@ -227,20 +225,14 @@ class Chatbot:
 
     def sim(self, u, v):
       """Calculates a given distance function between vectors u and v"""
-      commonMovies = set(u.keys()).union(set(v).keys())
-      meanU = sum(u.values()) / float(len(u.values()))
-      meanV = sum(v.values()) / float(len(v.values()))
-      deviationU = 0.0
-      deviationV = 0.0
-      stdU = 0.0
-      stdV = 0.0
-      for movie in commonMovies:
-        deviationU += u[movie] - meanU
-        deviationV = v[movie] - meanV
-        stdU += (u[movie] - meanU)**2
-        stdV += (v[movie] - meanV)**2
-
-      return (deviationU * deviationV) / sqrt(stdU * stdV)
+      commonMovies = set(u.keys()).intersection(set(v.keys()))
+      if not commonMovies:
+        return 0.0
+      deviationU = sum(u[movie] for movie in commonMovies)
+      deviationV = sum(v[movie] for movie in commonMovies)
+      stdU = sum(u[movie]**2 for movie in commonMovies)
+      stdV = sum(v[movie]**2 for movie in commonMovies)
+      return (deviationU * deviationV) / math.sqrt(stdU * stdV)
 
 
     def recommend(self, u):
@@ -249,14 +241,17 @@ class Chatbot:
       
       match = None
       score = 0.0
-      for user, ratingMap in self.ratings:
-        sim = self.sim(u, ratingMap)
-        if sim > score:
-          score = sim
+      i = None
+      for user, ratingMap in self.ratings.iteritems():
+        similarity = self.sim(u, ratingMap)
+        if similarity > score:
+          score = similarity
           match = ratingMap
+          i = user
+        print 'user: %s \t sim: %s' % (user, similarity)
 
-
-      unseenMovies = set(ratingMap.keys()).difference(u.keys())
+      unseenMovies = set(ratingMap.keys()).difference(set(u.keys()))
+      print 'user: ', i
       return [movie for movie in unseenMovies if ratingMap[movie] > 0]
         
 
