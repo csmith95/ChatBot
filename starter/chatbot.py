@@ -80,13 +80,9 @@ class Chatbot:
       """
       input = input.lower()
       self.updateSentimentDict(input)
-      inputtedMoviesInfo = [] #Returns list of [movie id, genre|genre]
+      inputtedMoviesInfo = [] #Returns list of [movie id, title, genre|genre]
       inputtedMoviesInfo = self.returnIdsTitlesGenres(self.extractMovies(input))
-
-      # print inputtedMoviesInfo
-      # print sentimentWords
       
-      print len(self.sentimentDict)
       if len(self.sentimentDict) == 5:
         print 'rec: ', self.recommend(self.sentimentDict)
         # return ', '.join(self.recommend(self.sentimentDict))
@@ -132,26 +128,30 @@ class Chatbot:
         regexTitle = '([\w\s\',:\&¡!\*\]\[\$.-]*)(\s\(.*)?'
         titlesGenres = []
         for movie in self.titles1: # Create list of movie titles
-            # print movie[1]
             found = re.findall(regexTitle, movie[0], re.UNICODE)
-            title = found[0][0].lower()
+            title = found[0][0].lower().strip()
+            if ', the' in title:
+                title = self.fixTheIssue(title)
             length = len(title)
             if length != 0:
-                if title[length - 1] == " ":
-                    title = title[:-1]
+                # if title[length - 1] == " ":
+                #     title = title[:-1]
                 titlesGenres.append([title, movie[1]])
             else:
                 titlesGenres.append([movie[0], movie[1]])
-                print "PROBLEM MOVIE:"
-                print movie
-                print "Appending:"
-                print movie[0]
-                print movie[1]
 
         idToTitleDict = {}
         for i, movie in enumerate(self.titles):
             idToTitleDict[i] = titlesGenres[i]
         return idToTitleDict
+
+    # Ex. 'big short, the'
+    def fixTheIssue(self, title):
+        length = len(title)
+        l = length - 5
+        if title[l:] == ', the':
+            title = 'the ' + title[:-5]
+        return title
 
     #Classifies input as overall positive or negative and stores that in dict with movie ID
     def updateSentimentDict(self, input):
