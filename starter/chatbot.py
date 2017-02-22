@@ -80,7 +80,7 @@ class Chatbot:
       """
       input = input.lower()
       self.updateSentimentDict(input)
-      inputtedMoviesInfo = [] #Returns list of [movie id, genre|genre]
+      inputtedMoviesInfo = [] #Returns list of [movie id, title, genre|genre]
       inputtedMoviesInfo = self.returnIdsTitlesGenres(self.extractMovies(input))
 
       print inputtedMoviesInfo
