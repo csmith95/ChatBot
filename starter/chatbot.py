@@ -10,12 +10,9 @@ import csv
 import math
 import re
 import numpy as np
-
 import sys
-
 from movielens import ratings
 from random import randint
-#from PorterStemmer import PorterStemmer
 
 class Chatbot:
     """Simple class to implement the chatbot for PA 6."""
@@ -40,11 +37,17 @@ class Chatbot:
 
     def greeting(self):
       """chatbot greeting message"""
-      #############################################################################
-      # TODO: Write a short greeting message                                      #
-      #############################################################################
-
-      greeting_message = 'Suh dude.'
+      r = randint(0,6)
+      messages = {
+        0 : 'Suh dude.',
+        1 : 'Haiiiiiiiiii',
+        2 : 'How\'s it hangin, big fellah?',
+        3 : 'Howdy, partner.',
+        4 : 'Hola muchacho.',
+        5 : 'Whats up, fucker.',
+        6 : 'Yo, niqqqqqa.'
+      }
+      greeting_message = messages[r]
 
       #############################################################################
       #                             END OF YOUR CODE                              #
@@ -54,13 +57,13 @@ class Chatbot:
 
     def goodbye(self):
       """chatbot goodbye message"""
-      #############################################################################
-      # TODO: Write a short farewell message                                      #
-      #############################################################################
-      r = randint(0,1)
+
+      r = randint(0,4)
       messages = {
         0 : 'See ya in a while crocodile :*',
-        1 : 'Catch ya later alligator ;)'
+        1 : 'Catch ya later alligator ;)',
+        3 : 'Adios bitchacho.',
+        4 : 'Alright. Fuck off then.'
       }
       goodbye_message = messages[r]
 
@@ -312,6 +315,12 @@ class Chatbot:
       return self.name
 
 
+#############################################################################
+# PorterStemmer                                                             #
+#                                                                           #
+# DO NOT CHANGE THE CODE BELOW!                                             #
+#                                                                           #
+#############################################################################
 class PorterStemmer:
 
     def __init__(self):
@@ -628,9 +637,16 @@ class PorterStemmer:
         self.step5()
         return self.b[self.k0:self.k+1]
 
+#############################################################################
+# End PorterStemmer                                                         #
+#                                                                           #
+# DO NOT CHANGE THE CODE ABOVE!                                             #
+#                                                                           #
+#############################################################################
 
 if __name__ == '__main__':
     Chatbot()
+    ## PorterStemmer code below ##
     p = PorterStemmer()
     if len(sys.argv) > 1:
         for f in sys.argv[1:]:
