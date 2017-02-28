@@ -95,7 +95,7 @@ class Chatbot:
 
         #user hasnt entered 5 movies yet
         if len(self.sentimentDict) < 5:
-            request = 'Another one.'
+            request = 'Anotha one.'
             confirm = 'Dats coo. '
             if len(self.sentimentDict) == 0: #first movie from user
                 request = 'Please tell me about a movie you liked or didn\'t like.'
