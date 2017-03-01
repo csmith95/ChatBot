@@ -102,7 +102,7 @@ class Chatbot:
         if self.is_turbo == True:
             mode = '(creative) '
 
-        input = input.lower()
+        # input = input.lower()
         self.updateSentimentDict(input)
         inputtedMoviesInfo = [] #Returns list of [movie id, title, genre|genre]
         inputtedMoviesInfo = self.returnIdsTitlesGenres(self.extractMovies(input))
@@ -126,14 +126,16 @@ class Chatbot:
             if self.state == 'generating':
                 self.state = 'generated'
                 self.recommendations = self.recommend(self.sentimentDict)
-                print color.BOLD + '\nI recommend \'' + self.titleDict[self.recommendations[0][0]][0] + '\'' + color.END + '\n'
+                title = self.fixTheIssue(self.titleDict[self.recommendations[0][0]][0])
+                print color.BOLD + '\nI recommend \'' + title + '\'' + color.END + '\n'
                 self.recommendations.pop(0)
             else:
                 if 'yes' in input:
                     if len(self.recommendations) == 0:
                         response = "Sorry, that was my last recommendation!"
                     else:
-                        print color.BOLD + '\nI recommend \'' + self.titleDict[self.recommendations[0][0]][0] + '\'' + color.END + '\n'
+                        title = self.fixTheIssue(self.titleDict[self.recommendations[0][0]][0])
+                        print color.BOLD + '\nI recommend \'' + title + '\'' + color.END + '\n'
                         self.recommendations.pop(0)
                 else:
                     response = "Guess we're done here. Need to figure out how to quit!"
@@ -159,7 +161,8 @@ class Chatbot:
 
     # Returns dict from input words to sentiments pos/neg
     def extractSentiment(self, input, src_file='data/sentiment.txt') :
-        tokens = input.split()
+        tokens = self.nonTitleWords(input)
+        tokens = tokens.split()
         tokenSet = set(tokens)
         sentimentDict = self.sentiments(src_file, ',', csv.QUOTE_MINIMAL)
         tokensSentimentDict = {}
@@ -169,8 +172,17 @@ class Chatbot:
                 tokensSentimentDict[word] = sentimentDict[word]
         return tokensSentimentDict
 
+    def nonTitleWords(self, input) :
+        length = len(input)
+        index = input.find('\"', 0, length)
+        partOne = input[:-(length-index)]
+        index = input.find('\"', index + 1, length)
+        partTwo = input[index + 1:]
+        nonTitleWords = partOne + partTwo
+        return nonTitleWords
+
     # Returns sentiment.txt in dict form
-    def sentiments(self, src_file, delimiter, quoting):
+    def sentiments(self, src_file, delimiter, quoting) :
         reader = csv.reader(file(src_file), delimiter=delimiter, quoting=quoting)
         sentimentDict = {}
         for line in reader:
@@ -179,46 +191,56 @@ class Chatbot:
             sentimentDict[word] = sent
         return sentimentDict
 
-    #Returns dict of movie ID to [title w/o year, genre]
+    #Creates map from ID to movie title as listed in movies.txt [title, genre]
+    #Inlcudes titles with format: Matrix, The
     def createTitleDict(self):
         self.titles1, self.ratings = ratings()
-        #Regex currently doesnt handle parenthesis in title.
-            # Ex. "(500) Days of Summer"
-        regexTitle = '([\w\s\',:\&¡!\*\]\[\$.-]*)(\s\(.*)?'
         titlesGenres = []
         for movie in self.titles1: # Create list of movie titles
-            found = re.findall(regexTitle, movie[0], re.UNICODE)
-            title = found[0][0].lower().strip()
-            if ', the' in title:
-                title = self.fixTheIssue(title)
-            length = len(title)
-            if length != 0:
-                # if title[length - 1] == " ":
-                #     title = title[:-1]
-                titlesGenres.append([title, movie[1]])
-            else:
-                titlesGenres.append([movie[0], movie[1]])
-
+            title = movie[0]
+            titlesGenres.append([title, movie[1]])
         idToTitleDict = {}
         for i, movie in enumerate(self.titles):
             idToTitleDict[i] = titlesGenres[i]
         return idToTitleDict
 
+
+    #Returns dict of movie ID to [title w/o year, genre]
+    # "Matrix, The (1999)" needs to be returned for input "Matrix (1999)" or "The Matrix (1999)"
+    # def createTitleDict(self):
+    #     self.titles1, self.ratings = ratings()
+    #     #Regex currently doesnt handle parenthesis in title.
+    #         # Ex. "(500) Days of Summer"
+    #     #regexTitle = '([\w\s\',:\&¡!\*\]\[\$.-]*)(\s\([0-9]{4}\))?'
+    #     titlesGenres = []
+    #     for movie in self.titles1: # Create list of movie titles
+    #         # found = re.findall(regexTitle, movie[0], re.UNICODE)
+    #         title = movie[0]
+    #         title = self.fixTheIssue(title)
+    #         titlesGenres.append([title, movie[1]])
+    #     idToTitleDict = {}
+    #     for i, movie in enumerate(self.titles):
+    #         idToTitleDict[i] = titlesGenres[i]
+    #     return idToTitleDict
+
     # Ex. 'big short, the'
     def fixTheIssue(self, title):
-        length = len(title)
-        l = length - 5
-        if title[l:] == ', the':
-            title = 'the ' + title[:-5]
+        index = title.find(', The', 0, len(title))
+        if index == -1:
+            return title
+        else:
+            length = len(title)
+            partOne = title[:-(length-index)]
+            partTwo = title[(index + 5):]
+            title = 'The ' + partOne + partTwo
         return title
 
     #Classifies input as overall positive or negative and stores that in dict with movie ID
     def updateSentimentDict(self, input):
         binarySent = self.binarizeInputSentiment(input)
         for inputTitle in self.extractMovies(input):
-        #   print inputTitle
           for id, title in self.titleDict.iteritems():
-              if title[0] == inputTitle: #What if movie is already in sentDict??
+              if self.fixTheIssue(title[0]).lower() == inputTitle.lower(): #What if movie is already in sentDict??
                   self.sentimentDict[id] = binarySent
 
     #Takes input, looks at sentiment words, computes overall sentiment based on
@@ -244,8 +266,12 @@ class Chatbot:
         movieInfo = []
         for inputTitle in inputTitles:
             for id, info in self.titleDict.iteritems():
-                if info[0] == inputTitle:
-                    movieInfo.append([id, info[0], info[1]])
+                fixedTitle = self.fixTheIssue(info[0])
+                # if fixedTitle == 'The Big Short':
+                #     print info
+                #     print fixedTitle
+                if fixedTitle.lower() == inputTitle.lower():
+                    movieInfo.append([id, fixedTitle, info[1]])
                     break
                 if id == len(self.titleDict) - 1:
                     movieInfo.append(["NOT_FOUND"])
