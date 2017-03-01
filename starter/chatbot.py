@@ -43,6 +43,8 @@ class Chatbot:
       self.p = PorterStemmer()
       self.sentimentDict = {} #movie to +/-1 , like/dislike
       self.titleDict = self.createTitleDict() #Movie ID to [title, genre]
+      self.state = 'generating'
+      self.recommendations = [] #list of top 5 movie rec IDs
 
     #############################################################################
     # 1. WARM UP REPL
@@ -60,7 +62,7 @@ class Chatbot:
         5 : 'Whats up, fucker.',
         6 : 'Yo, niqqqqqa.'
       }
-      greeting_message = messages[r]
+      greeting_message = messages[r] + ' I\'m ' + self.name + '! I\'m going to recommend a movie for you. First I will ask you about your taste in movies. Tell me about a movie that you have seen.'
 
       #############################################################################
       #                             END OF YOUR CODE                              #
@@ -107,11 +109,12 @@ class Chatbot:
         # print inputtedMoviesInfo
 
         #For the purposes of testing
-        # self.sentimentDict = {0: 1, 8858: 1, 3460: 1, 7277: 1, 4614: 1}
+        self.sentimentDict = {0: 1, 8858: -1, 3464: -1, 7477: -1, 4514: -1}
+        inputtedMoviesInfo = ['not empty']
         # print self.sentimentDict
 
-        #user hasnt entered 5 movies yet
-        if len(self.sentimentDict) < 5:
+
+        if len(self.sentimentDict) < 5: #user hasnt entered 5 movies yet
             request = 'Anotha one.'
             confirm = 'Dats coo. '
             if len(self.sentimentDict) == 0: #first movie from user
@@ -119,14 +122,21 @@ class Chatbot:
                 confirm = ''
             response = mode + confirm + request
         else:
-            response = 'Would you like some more recommendations?'
-            recommendations = self.recommend(self.sentimentDict)
-            print color.BOLD + '\nI recommend these movies:' + color.END
-            for movieTuple in recommendations:
-                print self.titleDict[movieTuple[0]][0]
-            print '\n'
-            # response = 'I recommend: ', self.recommend(self.sentimentDict)
-            # return ', '.join(self.recommend(self.sentimentDict))
+            response = 'Would you like another more recommendations? (yes/no)'
+            if self.state == 'generating':
+                self.state = 'generated'
+                self.recommendations = self.recommend(self.sentimentDict)
+                print color.BOLD + '\nI recommend \'' + self.titleDict[self.recommendations[0][0]][0] + '\'' + color.END + '\n'
+                self.recommendations.pop(0)
+            else:
+                if 'yes' in input:
+                    if len(self.recommendations) == 0:
+                        response = "Sorry, that was my last recommendation!"
+                    else:
+                        print color.BOLD + '\nI recommend \'' + self.titleDict[self.recommendations[0][0]][0] + '\'' + color.END + '\n'
+                        self.recommendations.pop(0)
+                else:
+                    response = "Guess we're done here. Need to figure out how to quit!"
 
         #user enters no movie titles in quotes
         if len(inputtedMoviesInfo) == 0:
@@ -297,7 +307,6 @@ class Chatbot:
           match = ratingMap
           i = user
         # print 'user: %s \t sim: %s' % (user, similarity)
-
       unseenMovies = set(ratingMap.keys()).difference(set(u.keys()))
       topFive = []
       for movie in unseenMovies:
@@ -309,7 +318,8 @@ class Chatbot:
                   topFive[4] = (movie, ratingMap[movie])
                   topFive = sorted(topFive, key = itemgetter(1), reverse = True)
       return topFive
-      #   return [movie for movie in unseenMovies if ratingMap[movie] > 0]
+
+    #   return [movie for movie in unseenMovies if ratingMap[movie] > 0]
 
 
     #############################################################################
