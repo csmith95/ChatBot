@@ -35,30 +35,30 @@ class State:
   EMPTY_RECS = 2
 
 
-   """                                    **** TODO ***** 
+"""                                    **** TODO *****
 
-    rubric: https://docs.google.com/spreadsheets/d/1_2Gkaj1eonFr16LXpeAgOdcgH2_uLTmvyCV3lQZFYEI/edit#gid=1926203681
+rubric: https://docs.google.com/spreadsheets/d/1_2Gkaj1eonFr16LXpeAgOdcgH2_uLTmvyCV3lQZFYEI/edit#gid=1926203681
 
-    ** Unclaimed **
-    refine recommendations if user wants to add more after receiving initial ones
-    support user explicitly asking for a recommendation
-    handle conjunctions ("I like ___, but hated ____")  ** strategy: split at the conjunction, classify separately
-    make sure rudolfa can handle multiple titles in almost any case
-      ex: expand removeTitleWords function to handle multiple titles
-      ex: if only some of the movies can't be matched, don't reprompt for all the movies
+** Unclaimed **
+refine recommendations if user wants to add more after receiving initial ones
+support user explicitly asking for a recommendation
+handle conjunctions ("I like ___, but hated ____")  ** strategy: split at the conjunction, classify separately
+make sure rudolfa can handle multiple titles in almost any case
+  ex: expand removeTitleWords function to handle multiple titles
+  ex: if only some of the movies can't be matched, don't reprompt for all the movies
 
-    ** CS ** 
-      clean up process() logical flow
-      item-based collaborative filtering
-      make yes/no parsing more robust
-      randomize request/confirm strings
-        confirmation strings should indicate like/dislike. ex: I liked ____ too! tell me about another movie. OR  glad you enjoyed ___. Anotha one.
-        handle case when user inputs same movie multiple times with same/diff rating
+** CS **
+  clean up process() logical flow
+  item-based collaborative filtering
+  make yes/no parsing more robust
+  randomize request/confirm strings
+    confirmation strings should indicate like/dislike. ex: I liked ____ too! tell me about another movie. OR  glad you enjoyed ___. Anotha one.
+    handle case when user inputs same movie multiple times with same/diff rating
 
-    ** TJ **
+** TJ **
 
 
-  """
+"""
 
 
 class Chatbot:
@@ -73,6 +73,7 @@ class Chatbot:
     def __init__(self, is_turbo=False):
       self.name = 'Rudolfa'
       self.is_turbo = is_turbo
+      self.mode = '(starter) '
       self.titleDict = self.createTitleDict() # Movie ID to [title, genre]
       self.binarize()
       self.p = PorterStemmer()
@@ -80,6 +81,7 @@ class Chatbot:
       self.buildWordToSentimentDict()
       self.userPreferencesMap = {} # movie to +/-1 , like/dislike
       self.state = State.NEED_INFO
+      self.givenRecommendations = [] # list of previously given recs not to be repeated
       self.recommendations = [] # list of top 5 movie rec IDs
 
     #############################################################################
@@ -134,72 +136,77 @@ class Chatbot:
         1) extract the relevant information and
         2) transform the information into a response to the user
         """
-        mode = '(starter) '
         if self.is_turbo == True:
-            mode = '(creative) '
-
-
+            self.mode = '(creative) '
 
         extractedMovies = self.extractMovies(input)
-        if extractMovies:
-          
-
         self.updateSentimentDict(input)
         inputtedMoviesInfo = [] #Returns list of [movie id, title, genre|genre]
-        inputtedMoviesInfo = self.returnIdsTitlesGenres(extractMovies)
-        # print inputtedMoviesInfo
+        inputtedMoviesInfo = self.returnIdsTitlesGenres(extractedMovies)
+        numInputtedMovies = len(inputtedMoviesInfo)
 
-        #For the purposes of testing
-        # self.sentimentDict = {0: 1, 8858: -1, 3464: -1, 7477: -1, 4514: -1}
-        # inputtedMoviesInfo = ['not empty']
-        # print self.sentimentDict
-
+        if len(self.userPreferencesMap) < 5:
+            response = self.notEnoughData()
+        else:
+            response = 'Would you like another movie recommendation? (yes/no) Optionally, tell me about another movie to refine my recommendations!'
+            if self.state == State.NEED_INFO:
+                self.popRecommendation()
+            elif self.state == State.GENERATED_RECS:
+                response = self.promptUserPreRec(input, numInputtedMovies)
 
         if self.state == State.NEED_INFO:
-            request = 'Anotha one.'
-            confirm = 'Dats coo. '
-            if len(self.userPreferencesMap) == 0: # first movie from user
-                request = 'Please tell me about a movie you liked or didn\'t like.'
-                confirm = ''
-            response = mode + confirm + request
-
-
-
-
-        if len(self.userPreferencesMap) < 3: #user hasnt entered 5 movies yet
-            request = 'Anotha one.'
-            confirm = 'Dats coo. '
-            if len(self.userPreferencesMap) == 0: #first movie from user
-                request = 'Please tell me about a movie you liked or didn\'t like.'
-                confirm = ''
-            response = mode + confirm + request
-        else:
-            response = 'Would you like another movie recommendation? (yes/no)'
-            if self.state == 'generating':
-                self.state = 'generated'
-                self.recommendations = self.recommend()
-                title = self.fixDanglingArticle(self.titleDict[self.recommendations.pop(0)][0])
-                print color.BOLD + '\nI recommend \'' + title + '\'' + color.END + '\n'
-                self.recommendations.pop(0)
-            else:
-                if 'yes' in input:
-                    if len(self.recommendations) == 0:
-                        response = "Sorry, that was my last recommendation!"
-                    else:
-                        title = self.fixDanglingArticle(self.titleDict[self.recommendations.pop(0)][0])
-                        print color.BOLD + '\nI recommend \'' + title + '\'' + color.END + '\n'
-                else:
-                    response = "Guess we're done here. Need to figure out how to quit!"
-
-        if self.state == 'generating':
-            #user enters no movie titles in quotes
-            if len(inputtedMoviesInfo) == 0:
-                response = mode + 'Please tell me about a movie. Remember to use double quotes around its title.'
-            #user enters a title not in movies.txt
-            if ['NOT_FOUND'] in inputtedMoviesInfo:
-                response = mode + 'Don\'t think I know that movie. Please try telling me about a different one.'
+            response = self.handleInputIssues(inputtedMoviesInfo)
 
         return response
+
+
+
+    def handleInputIssues(self, inputtedMoviesInfo) :
+        if len(inputtedMoviesInfo) == 0: #user enters no movie titles in quotes
+            return self.mode + 'Please tell me about a movie. Remember to use double quotes around its title.'
+        if ['NOT_FOUND'] in inputtedMoviesInfo: #user enters a title not in movies.txt
+            return self.mode + 'Don\'t think I know that movie. Please try telling me about a different one.'
+
+
+    def notEnoughData(self) :
+        request = 'Anotha one.'
+        confirm = 'Dats coo. '
+        if len(self.userPreferencesMap) == 0: # first movie from user
+            request = 'Please tell me about a movie you liked or didn\'t like.'
+            confirm = ''
+        return self.mode + confirm + request
+
+
+    def popRecommendation(self) :
+            self.state = State.GENERATED_RECS
+            self.recommendations = self.recommend()
+            rec = self.recommendations.pop(0)
+            title = self.fixDanglingArticle(self.titleDict[rec][0])
+            print color.BOLD + '\nI recommend \'' + title + '\'' + color.END + '\n'
+            self.givenRecommendations.append(rec)
+
+
+    def promptUserPreRec(self, input, numInputtedMovies) :
+        response = 'Would you like another movie recommendation? (yes/no) Optionally, tell me about another movie to refine my recommendations!'
+        if 'yes' in input:
+            if len(self.recommendations) == 0:
+                response = "Sorry, that was my last recommendation!"
+            else:
+                rec = self.recommendations.pop(0)
+                title = self.fixDanglingArticle(self.titleDict[rec][0])
+                print color.BOLD + '\nI recommend \'' + title + '\'' + color.END + '\n'
+                self.givenRecommendations.append(rec)
+        elif 'no' in input:
+            response = "Guess we're done here. Enter \':quit\' to exit!"
+        else: # Begin recommendation refinement
+            if numInputtedMovies == 0: #no additonal movie from user
+                self.state = State.NEED_INFO
+                request = 'Let\'s refine my recommendations then. Please tell me about an additional movie you liked or didn\'t like.'
+                response = self.mode + request
+            else:
+                self.popRecommendation()
+        return response
+
 
     # Returns list of movies entered in input
     def extractMovies(self, input) :
@@ -345,7 +352,7 @@ class Chatbot:
           score = similarity
           bestFitRatingMap = ratingMap
           bestFitUser = user
-        # if DEBUG: 
+        # if DEBUG:
         #   print 'user: %s \t sim: %s' % (user, similarity)
 
       unseenMovies = list(set(bestFitRatingMap.keys()).difference(set(ratingMap.keys())))
