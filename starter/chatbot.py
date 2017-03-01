@@ -193,14 +193,17 @@ class Chatbot:
 
     #Creates map from ID to movie title as listed in movies.txt [title, genre]
     #Inlcudes titles with format: Matrix, The
+    # More examples cases to handle:
+    # ["Legend of 1900, The (a.k.a. The Legend of the Pianist on the Ocean) (Leggenda del pianista sull'oceano) (1998)", 'Drama']
+    # Fast & Furious 6 (Fast and the Furious 6, The) (2013)
+    # 2 Fast 2 Furious (Fast and the Furious 2, The) (2003)
     def createTitleDict(self):
         self.titles1, self.ratings = ratings()
         titlesGenres = []
         for movie in self.titles1: # Create list of movie titles
 
             title = movie[0]
-            if title == "Legend of 1900, The (a.k.a. The Legend of the Pianist on the Ocean) (Leggenda del pianista sull'oceano) (1998)":
-                print movie
+            
             titlesGenres.append([title, movie[1]])
         idToTitleDict = {}
         for i, movie in enumerate(self.titles):
