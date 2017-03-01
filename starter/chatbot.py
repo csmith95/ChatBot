@@ -29,12 +29,36 @@ class color:
    END = '\033[0m'
 
 
-   # **** TODO *****
-    # handle case when user inputs same movie multiple times with same/diff rating
-    # implement item-based collaborative filtering
-    # refine recommendations if user wants to add more after receiving initial onces
-    # support user explicitly asking for a recommendation
-    # rubric tasks -- https://docs.google.com/spreadsheets/d/1_2Gkaj1eonFr16LXpeAgOdcgH2_uLTmvyCV3lQZFYEI/edit#gid=1926203681
+class State:
+  NEED_INFO = 0
+  GENERATED_RECS = 1
+  EMPTY_RECS = 2
+
+
+   """                                    **** TODO ***** 
+
+    rubric: https://docs.google.com/spreadsheets/d/1_2Gkaj1eonFr16LXpeAgOdcgH2_uLTmvyCV3lQZFYEI/edit#gid=1926203681
+
+    ** Unclaimed **
+    refine recommendations if user wants to add more after receiving initial ones
+    support user explicitly asking for a recommendation
+    handle conjunctions ("I like ___, but hated ____")  ** strategy: split at the conjunction, classify separately
+    make sure rudolfa can handle multiple titles in almost any case
+      ex: expand removeTitleWords function to handle multiple titles
+      ex: if only some of the movies can't be matched, don't reprompt for all the movies
+
+    ** CS ** 
+      clean up process() logical flow
+      item-based collaborative filtering
+      make yes/no parsing more robust
+      randomize request/confirm strings
+        confirmation strings should indicate like/dislike. ex: I liked ____ too! tell me about another movie. OR  glad you enjoyed ___. Anotha one.
+        handle case when user inputs same movie multiple times with same/diff rating
+
+    ** TJ **
+
+
+  """
 
 
 class Chatbot:
@@ -55,7 +79,7 @@ class Chatbot:
       self.wordToSentimentDict = collections.defaultdict(lambda: 0) # built using sentiment.txt (Ex: 'hate' --> -1)
       self.buildWordToSentimentDict()
       self.userPreferencesMap = {} # movie to +/-1 , like/dislike
-      self.state = 'generating'
+      self.state = State.NEED_INFO
       self.recommendations = [] # list of top 5 movie rec IDs
 
     #############################################################################
@@ -114,15 +138,32 @@ class Chatbot:
         if self.is_turbo == True:
             mode = '(creative) '
 
+
+
+        extractedMovies = self.extractMovies(input)
+        if extractMovies:
+          
+
         self.updateSentimentDict(input)
         inputtedMoviesInfo = [] #Returns list of [movie id, title, genre|genre]
-        inputtedMoviesInfo = self.returnIdsTitlesGenres(self.extractMovies(input))
+        inputtedMoviesInfo = self.returnIdsTitlesGenres(extractMovies)
         # print inputtedMoviesInfo
 
         #For the purposes of testing
         # self.sentimentDict = {0: 1, 8858: -1, 3464: -1, 7477: -1, 4514: -1}
         # inputtedMoviesInfo = ['not empty']
         # print self.sentimentDict
+
+
+        if self.state == State.NEED_INFO:
+            request = 'Anotha one.'
+            confirm = 'Dats coo. '
+            if len(self.userPreferencesMap) == 0: # first movie from user
+                request = 'Please tell me about a movie you liked or didn\'t like.'
+                confirm = ''
+            response = mode + confirm + request
+
+
 
 
         if len(self.userPreferencesMap) < 3: #user hasnt entered 5 movies yet
