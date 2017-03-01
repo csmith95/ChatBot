@@ -102,7 +102,6 @@ class Chatbot:
         if self.is_turbo == True:
             mode = '(creative) '
 
-        # input = input.lower()
         self.updateSentimentDict(input)
         inputtedMoviesInfo = [] #Returns list of [movie id, title, genre|genre]
         inputtedMoviesInfo = self.returnIdsTitlesGenres(self.extractMovies(input))
@@ -193,41 +192,16 @@ class Chatbot:
 
     #Creates map from ID to movie title as listed in movies.txt [title, genre]
     #Inlcudes titles with format: Matrix, The
-    # More examples cases to handle:
-    # ["Legend of 1900, The (a.k.a. The Legend of the Pianist on the Ocean) (Leggenda del pianista sull'oceano) (1998)", 'Drama']
-    # Fast & Furious 6 (Fast and the Furious 6, The) (2013)
-    # 2 Fast 2 Furious (Fast and the Furious 2, The) (2003)
     def createTitleDict(self):
         self.titles1, self.ratings = ratings()
         titlesGenres = []
         for movie in self.titles1: # Create list of movie titles
-
             title = movie[0]
-            
             titlesGenres.append([title, movie[1]])
         idToTitleDict = {}
         for i, movie in enumerate(self.titles):
             idToTitleDict[i] = titlesGenres[i]
         return idToTitleDict
-
-
-    #Returns dict of movie ID to [title w/o year, genre]
-    # "Matrix, The (1999)" needs to be returned for input "Matrix (1999)" or "The Matrix (1999)"
-    # def createTitleDict(self):
-    #     self.titles1, self.ratings = ratings()
-    #     #Regex currently doesnt handle parenthesis in title.
-    #         # Ex. "(500) Days of Summer"
-    #     #regexTitle = '([\w\s\',:\&¡!\*\]\[\$.-]*)(\s\([0-9]{4}\))?'
-    #     titlesGenres = []
-    #     for movie in self.titles1: # Create list of movie titles
-    #         # found = re.findall(regexTitle, movie[0], re.UNICODE)
-    #         title = movie[0]
-    #         title = self.fixTheIssue(title)
-    #         titlesGenres.append([title, movie[1]])
-    #     idToTitleDict = {}
-    #     for i, movie in enumerate(self.titles):
-    #         idToTitleDict[i] = titlesGenres[i]
-    #     return idToTitleDict
 
     # Ex. 'big short, the'
     def fixTheIssue(self, title):
@@ -246,8 +220,43 @@ class Chatbot:
         binarySent = self.binarizeInputSentiment(input)
         for inputTitle in self.extractMovies(input):
           for id, title in self.titleDict.iteritems():
-              if self.fixTheIssue(title[0]).lower() == inputTitle.lower(): #What if movie is already in sentDict??
+              if self.matchesTitle(title[0], inputTitle):
                   self.sentimentDict[id] = binarySent
+
+
+    #Returns true if the inputted title matches the title listed in movies.txt
+    #Handles alternate titles
+    # Examples listed titles to handle:
+    # "Legend of 1900, The (a.k.a. The Legend of the Pianist on the Ocean) (Leggenda del pianista sull'oceano) (1998)"
+    # "Fast & Furious 6 (Fast and the Furious 6, The) (2013)"
+    # "2 Fast 2 Furious (Fast and the Furious 2, The) (2003)"
+    def matchesTitle(self, listedTitle, inputTitle) :
+        if inputTitle == listedTitle:
+            return True
+        regexTitles = '(^[\w\s\',:\&¡!\*\]\[\$.-]*)(\([\w\s\',:\&¡!\*\]\[\$.-]*\)\s)?(\([\w\s\',:\&¡!\*\]\[\$.-]*\)\s)?(\([0-9]{4}\)$)?'
+        alternateTitles = re.findall(regexTitles, listedTitle)
+        year = alternateTitles[0][3]
+        for title in alternateTitles[0][:-1]:
+            title = title.strip()
+            if title == '':
+                continue
+            if 'a.k.a. ' in title:
+                index = title.find('a.k.a. ', 0, len(title))
+                title = title[index + 7:]
+            if title[0] == '(':
+                title = title[1:]
+            if title[len(title) - 1] == ')':
+                title = title[:-1]
+            fixedTitle = self.fixTheIssue(title) + ' ' + year
+            if fixedTitle.lower() == inputTitle.lower():
+                return True
+            if fixedTitle.find('The ', 0, 6) == 0:
+                fixedTitle = fixedTitle[4:]
+            if fixedTitle.lower() == inputTitle.lower():
+                return True
+            if fixedTitle[:-7].lower() == inputTitle.lower():
+                return True
+        return False
 
     #Takes input, looks at sentiment words, computes overall sentiment based on
     #whether there are mor pos or neg words. returns pos if tie
@@ -272,12 +281,8 @@ class Chatbot:
         movieInfo = []
         for inputTitle in inputTitles:
             for id, info in self.titleDict.iteritems():
-                fixedTitle = self.fixTheIssue(info[0])
-                # if fixedTitle == 'The Big Short':
-                #     print info
-                #     print fixedTitle
-                if fixedTitle.lower() == inputTitle.lower():
-                    movieInfo.append([id, fixedTitle, info[1]])
+                if self.matchesTitle(info[0], inputTitle):
+                    movieInfo.append([id, info[0], info[1]])
                     break
                 if id == len(self.titleDict) - 1:
                     movieInfo.append(["NOT_FOUND"])
