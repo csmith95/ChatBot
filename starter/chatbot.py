@@ -13,6 +13,19 @@ import numpy as np
 import sys
 from movielens import ratings
 from random import randint
+from operator import itemgetter
+
+class color:
+   PURPLE = '\033[95m'
+   CYAN = '\033[96m'
+   DARKCYAN = '\033[36m'
+   BLUE = '\033[94m'
+   GREEN = '\033[92m'
+   YELLOW = '\033[93m'
+   RED = '\033[91m'
+   BOLD = '\033[1m'
+   UNDERLINE = '\033[4m'
+   END = '\033[0m'
 
 class Chatbot:
     """Simple class to implement the chatbot for PA 6."""
@@ -89,9 +102,13 @@ class Chatbot:
 
         input = input.lower()
         self.updateSentimentDict(input)
-        # print self.sentimentDict
         inputtedMoviesInfo = [] #Returns list of [movie id, title, genre|genre]
         inputtedMoviesInfo = self.returnIdsTitlesGenres(self.extractMovies(input))
+        # print inputtedMoviesInfo
+
+        #For the purposes of testing
+        # self.sentimentDict = {0: 1, 8858: 1, 3460: 1, 7277: 1, 4614: 1}
+        # print self.sentimentDict
 
         #user hasnt entered 5 movies yet
         if len(self.sentimentDict) < 5:
@@ -102,7 +119,13 @@ class Chatbot:
                 confirm = ''
             response = mode + confirm + request
         else:
-            response = 'I recommend: ', self.recommend(self.sentimentDict)
+            response = 'Would you like some more recommendations?'
+            recommendations = self.recommend(self.sentimentDict)
+            print color.BOLD + '\nI recommend these movies:' + color.END
+            for movieTuple in recommendations:
+                print self.titleDict[movieTuple[0]][0]
+            print '\n'
+            # response = 'I recommend: ', self.recommend(self.sentimentDict)
             # return ', '.join(self.recommend(self.sentimentDict))
 
         #user enters no movie titles in quotes
@@ -273,11 +296,20 @@ class Chatbot:
           score = similarity
           match = ratingMap
           i = user
-        print 'user: %s \t sim: %s' % (user, similarity)
+        # print 'user: %s \t sim: %s' % (user, similarity)
 
       unseenMovies = set(ratingMap.keys()).difference(set(u.keys()))
-      print 'user: ', i
-      return [movie for movie in unseenMovies if ratingMap[movie] > 0]
+      topFive = []
+      for movie in unseenMovies:
+          if ratingMap[movie] > 0:
+              if len(topFive) < 5:
+                  topFive.append((movie, ratingMap[movie]))
+                  topFive = sorted(topFive, key = itemgetter(1), reverse = True)
+              elif ratingMap[movie] > topFive[4][1]:
+                  topFive[4] = (movie, ratingMap[movie])
+                  topFive = sorted(topFive, key = itemgetter(1), reverse = True)
+      return topFive
+      #   return [movie for movie in unseenMovies if ratingMap[movie] > 0]
 
 
     #############################################################################
