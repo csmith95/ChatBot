@@ -109,8 +109,8 @@ class Chatbot:
         # print inputtedMoviesInfo
 
         #For the purposes of testing
-        self.sentimentDict = {0: 1, 8858: -1, 3464: -1, 7477: -1, 4514: -1}
-        inputtedMoviesInfo = ['not empty']
+        # self.sentimentDict = {0: 1, 8858: -1, 3464: -1, 7477: -1, 4514: -1}
+        # inputtedMoviesInfo = ['not empty']
         # print self.sentimentDict
 
 
@@ -122,7 +122,7 @@ class Chatbot:
                 confirm = ''
             response = mode + confirm + request
         else:
-            response = 'Would you like another more recommendations? (yes/no)'
+            response = 'Would you like another movie recommendation? (yes/no)'
             if self.state == 'generating':
                 self.state = 'generated'
                 self.recommendations = self.recommend(self.sentimentDict)
@@ -138,12 +138,13 @@ class Chatbot:
                 else:
                     response = "Guess we're done here. Need to figure out how to quit!"
 
-        #user enters no movie titles in quotes
-        if len(inputtedMoviesInfo) == 0:
-            response = mode + 'Please tell me about a movie. Remember to use double quotes around its title.'
-        #user enters a title not in movies.txt
-        if ['NOT_FOUND'] in inputtedMoviesInfo:
-            response = mode + 'Don\'t think I know that movie. Please try telling me about a different one.'
+        if self.state == 'generating':
+            #user enters no movie titles in quotes
+            if len(inputtedMoviesInfo) == 0:
+                response = mode + 'Please tell me about a movie. Remember to use double quotes around its title.'
+            #user enters a title not in movies.txt
+            if ['NOT_FOUND'] in inputtedMoviesInfo:
+                response = mode + 'Don\'t think I know that movie. Please try telling me about a different one.'
 
         #   if self.is_turbo == True:
         #     response = 'processed %s in creative mode!!' % input
