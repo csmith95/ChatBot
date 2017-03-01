@@ -197,7 +197,10 @@ class Chatbot:
         self.titles1, self.ratings = ratings()
         titlesGenres = []
         for movie in self.titles1: # Create list of movie titles
+
             title = movie[0]
+            if title == "Legend of 1900, The (a.k.a. The Legend of the Pianist on the Ocean) (Leggenda del pianista sull'oceano) (1998)":
+                print movie
             titlesGenres.append([title, movie[1]])
         idToTitleDict = {}
         for i, movie in enumerate(self.titles):
