@@ -28,10 +28,16 @@ class color:
    UNDERLINE = '\033[4m'
    END = '\033[0m'
 
+
+   # **** TODO *****
+    # handle case when user inputs same movie multiple times with same/diff rating
+
+
 class Chatbot:
     """Simple class to implement the chatbot for PA 6."""
 
-    global binarize
+    global DEBUG
+    DEBUG = False
 
     #############################################################################
     # `moviebot` is the default chatbot. Change it to your chatbot's name       #
@@ -39,13 +45,12 @@ class Chatbot:
     def __init__(self, is_turbo=False):
       self.name = 'Rudolfa'
       self.is_turbo = is_turbo
-      self.read_data()
-      self.mean_center()
+      self.titleDict = self.createTitleDict() # Movie ID to [title, genre]
+      self.binarize()
       self.p = PorterStemmer()
       self.wordToSentimentDict = collections.defaultdict(lambda: 0) # built using sentiment.txt (Ex: 'hate' --> -1)
       self.buildWordToSentimentDict()
-      self.sentimentDict = {} # movie to +/-1 , like/dislike
-      self.titleDict = self.createTitleDict() # Movie ID to [title, genre]
+      self.userPreferencesMap = {} # movie to +/-1 , like/dislike
       self.state = 'generating'
       self.recommendations = [] # list of top 5 movie rec IDs
 
@@ -116,10 +121,10 @@ class Chatbot:
         # print self.sentimentDict
 
 
-        if len(self.sentimentDict) < 3: #user hasnt entered 5 movies yet
+        if len(self.userPreferencesMap) < 3: #user hasnt entered 5 movies yet
             request = 'Anotha one.'
             confirm = 'Dats coo. '
-            if len(self.sentimentDict) == 0: #first movie from user
+            if len(self.userPreferencesMap) == 0: #first movie from user
                 request = 'Please tell me about a movie you liked or didn\'t like.'
                 confirm = ''
             response = mode + confirm + request
@@ -127,8 +132,8 @@ class Chatbot:
             response = 'Would you like another movie recommendation? (yes/no)'
             if self.state == 'generating':
                 self.state = 'generated'
-                self.recommendations = self.recommend(self.sentimentDict)
-                title = self.fixTheIssue(self.titleDict[self.recommendations[0][0]][0])
+                self.recommendations = self.recommend()
+                title = self.fixDanglingArticle(self.titleDict[self.recommendations.pop(0)][0])
                 print color.BOLD + '\nI recommend \'' + title + '\'' + color.END + '\n'
                 self.recommendations.pop(0)
             else:
@@ -136,9 +141,8 @@ class Chatbot:
                     if len(self.recommendations) == 0:
                         response = "Sorry, that was my last recommendation!"
                     else:
-                        title = self.fixTheIssue(self.titleDict[self.recommendations[0][0]][0])
+                        title = self.fixDanglingArticle(self.titleDict[self.recommendations.pop(0)][0])
                         print color.BOLD + '\nI recommend \'' + title + '\'' + color.END + '\n'
-                        self.recommendations.pop(0)
                 else:
                     response = "Guess we're done here. Need to figure out how to quit!"
 
@@ -149,11 +153,6 @@ class Chatbot:
             #user enters a title not in movies.txt
             if ['NOT_FOUND'] in inputtedMoviesInfo:
                 response = mode + 'Don\'t think I know that movie. Please try telling me about a different one.'
-
-        #   if self.is_turbo == True:
-        #     response = 'processed %s in creative mode!!' % input
-        #   else:
-        #     response = 'processed %s in starter mode' % input
 
         return response
 
@@ -187,9 +186,9 @@ class Chatbot:
     #Creates map from ID to movie title as listed in movies.txt [title, genre]
     #Inlcudes titles with format: Matrix, The
     def createTitleDict(self):
-        self.titles1, self.ratings = ratings()
+        self.titles, self.ratings = ratings()
         titlesGenres = []
-        for movie in self.titles1: # Create list of movie titles
+        for movie in self.titles: # Create list of movie titles
             title = movie[0]
             titlesGenres.append([title, movie[1]])
         idToTitleDict = {}
@@ -198,7 +197,7 @@ class Chatbot:
         return idToTitleDict
 
     # Ex. 'big short, the'
-    def fixTheIssue(self, title):
+    def fixDanglingArticle(self, title):
         index = title.find(', The', 0, len(title))
         if index == -1:
             return title
@@ -215,7 +214,7 @@ class Chatbot:
         for inputTitle in self.extractMovies(input):
           for id, title in self.titleDict.iteritems():
               if self.matchesTitle(title[0], inputTitle):
-                  self.sentimentDict[id] = binarySentiment
+                  self.userPreferencesMap[id] = binarySentiment
 
 
     #Returns true if the inputted title matches the title listed in movies.txt
@@ -241,7 +240,7 @@ class Chatbot:
                 title = title[1:]
             if title[len(title) - 1] == ')':
                 title = title[:-1]
-            fixedTitle = self.fixTheIssue(title) + ' ' + year
+            fixedTitle = self.fixDanglingArticle(title) + ' ' + year
             if fixedTitle.lower() == inputTitle.lower():
                 return True
             if fixedTitle.find('The ', 0, 6) == 0:
@@ -271,69 +270,49 @@ class Chatbot:
     # 3. Movie Recommendation helper functions                                  #
     #############################################################################
 
-    def read_data(self):
-      """Reads the ratings matrix from file"""
-      # This matrix has the following shape: num_movies x num_users
-      # The values stored in each row i and column j is the rating for
-      # movie i by user j
-      self.titles, self.ratings = ratings()
-      reader = csv.reader(open('data/sentiment.txt', 'rb'))
-      self.sentiment = dict(reader)
-
-    def mean_center(self):
+    def binarize(self):
+      """Modifies the ratings matrix to make all of the ratings binary"""
       for user, ratingMap in self.ratings.iteritems():
         mean = sum(ratingMap.values()) / float(len(ratingMap.values()))
-        self.ratings[user] = {movie: binarize(rating, mean) for movie, rating in ratingMap.iteritems()}
-
-    def binarize(rating, mean):
-      """Modifies the ratings matrix to make all of the ratings binary"""
-      result = rating - mean
-      if result > 0:
-        return 1
-      elif result < 0:
-        return -1
-      return 0
-
+        self.ratings[user] = {movie: -1 if rating - mean < 0 else 1 for movie, rating in ratingMap.iteritems()}
 
     def sim(self, u, v):
       """Calculates a given distance function between vectors u and v"""
       commonMovies = set(u.keys()).intersection(set(v.keys()))
       if not commonMovies:
         return 0.0
-      deviationU = sum(u[movie] for movie in commonMovies)
-      deviationV = sum(v[movie] for movie in commonMovies)
+      numerator = sum(u[movie] * v[movie] for movie in commonMovies)
       stdU = sum(u[movie]**2 for movie in commonMovies)
       stdV = sum(v[movie]**2 for movie in commonMovies)
-      return (deviationU * deviationV) / math.sqrt(stdU * stdV)
+      return numerator / math.sqrt(stdU * stdV)
 
 
-    def recommend(self, u):
+    def recommend(self):
       """Generates a list of movies based on the input vector u using
       collaborative filtering"""
 
-      match = None
+      bestFitRatingMap = None
       score = 0.0
-      i = None
+      bestFitUser = None
       for user, ratingMap in self.ratings.iteritems():
-        similarity = self.sim(u, ratingMap)
+        similarity = self.sim(self.userPreferencesMap, ratingMap)
         if similarity > score:
           score = similarity
-          match = ratingMap
-          i = user
-        # print 'user: %s \t sim: %s' % (user, similarity)
-      unseenMovies = set(ratingMap.keys()).difference(set(u.keys()))
-      topFive = []
-      for movie in unseenMovies:
-          if ratingMap[movie] > 0:
-              if len(topFive) < 5:
-                  topFive.append((movie, ratingMap[movie]))
-                  topFive = sorted(topFive, key = itemgetter(1), reverse = True)
-              elif ratingMap[movie] > topFive[4][1]:
-                  topFive[4] = (movie, ratingMap[movie])
-                  topFive = sorted(topFive, key = itemgetter(1), reverse = True)
-      return topFive
+          bestFitRatingMap = ratingMap
+          bestFitUser = user
+        # if DEBUG: 
+          # print 'user: %s \t sim: %s' % (user, similarity)
 
-    #   return [movie for movie in unseenMovies if ratingMap[movie] > 0]
+      unseenMovies = list(set(bestFitRatingMap.keys()).difference(set(ratingMap.keys())))
+      topFive = [movieID for movieID in sorted(unseenMovies, key = lambda movieID : bestFitRatingMap[movieID])][-5:]
+
+      # if DEBUG:
+        # print 'User prefs: ', self.userPreferencesMap
+        # print 'Best fit user: ', bestFitUser
+        # print bestFitRatingMap
+        # print 'Top five: ', topFive
+
+      return topFive
 
 
     #############################################################################
