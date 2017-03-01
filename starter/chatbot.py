@@ -31,13 +31,17 @@ class color:
 
    # **** TODO *****
     # handle case when user inputs same movie multiple times with same/diff rating
+    # implement item-based collaborative filtering
+    # refine recommendations if user wants to add more after receiving initial onces
+    # support user explicitly asking for a recommendation
+    # rubric tasks -- https://docs.google.com/spreadsheets/d/1_2Gkaj1eonFr16LXpeAgOdcgH2_uLTmvyCV3lQZFYEI/edit#gid=1926203681
 
 
 class Chatbot:
     """Simple class to implement the chatbot for PA 6."""
 
     global DEBUG
-    DEBUG = False
+    DEBUG = True
 
     #############################################################################
     # `moviebot` is the default chatbot. Change it to your chatbot's name       #
@@ -276,8 +280,8 @@ class Chatbot:
         mean = sum(ratingMap.values()) / float(len(ratingMap.values()))
         self.ratings[user] = {movie: -1 if rating - mean < 0 else 1 for movie, rating in ratingMap.iteritems()}
 
-    def sim(self, u, v):
-      """Calculates a given distance function between vectors u and v"""
+    def dot(self, u, v):
+      """Calculates a given distance function between vectors u and v using dot product"""
       commonMovies = set(u.keys()).intersection(set(v.keys()))
       if not commonMovies:
         return 0.0
@@ -295,22 +299,22 @@ class Chatbot:
       score = 0.0
       bestFitUser = None
       for user, ratingMap in self.ratings.iteritems():
-        similarity = self.sim(self.userPreferencesMap, ratingMap)
+        similarity = self.dot(self.userPreferencesMap, ratingMap)
         if similarity > score:
           score = similarity
           bestFitRatingMap = ratingMap
           bestFitUser = user
         # if DEBUG: 
-          # print 'user: %s \t sim: %s' % (user, similarity)
+        #   print 'user: %s \t sim: %s' % (user, similarity)
 
       unseenMovies = list(set(bestFitRatingMap.keys()).difference(set(ratingMap.keys())))
       topFive = [movieID for movieID in sorted(unseenMovies, key = lambda movieID : bestFitRatingMap[movieID])][-5:]
 
-      # if DEBUG:
-        # print 'User prefs: ', self.userPreferencesMap
-        # print 'Best fit user: ', bestFitUser
+      if DEBUG:
+        print 'User prefs: ', self.userPreferencesMap
+        print 'Best fit user: ', bestFitUser
         # print bestFitRatingMap
-        # print 'Top five: ', topFive
+        print 'Top five: ', topFive
 
       return topFive
 
