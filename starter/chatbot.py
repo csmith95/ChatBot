@@ -81,7 +81,7 @@ class Chatbot:
       self.buildWordToSentimentDict()
       self.userPreferencesMap = {} # movie to +/-1 , like/dislike
       self.state = State.NEED_INFO
-      self.givenRecommendations = [] # list of previously given recs not to be repeated
+      self.givenRecommendations = set() # list of previously given recs not to be repeated
       self.recommendations = [] # list of top 5 movie rec IDs
 
     #############################################################################
@@ -183,7 +183,7 @@ class Chatbot:
             rec = self.recommendations.pop(0)
             title = self.fixDanglingArticle(self.titleDict[rec][0])
             print color.BOLD + '\nI recommend \'' + title + '\'' + color.END + '\n'
-            self.givenRecommendations.append(rec)
+            self.givenRecommendations.update(rec)
 
 
     def promptUserPreRec(self, input, numInputtedMovies) :
@@ -195,7 +195,7 @@ class Chatbot:
                 rec = self.recommendations.pop(0)
                 title = self.fixDanglingArticle(self.titleDict[rec][0])
                 print color.BOLD + '\nI recommend \'' + title + '\'' + color.END + '\n'
-                self.givenRecommendations.append(rec)
+                self.givenRecommendations.update(rec)
         elif 'no' in input:
             response = "Guess we're done here. Enter \':quit\' to exit!"
         else: # Begin recommendation refinement
