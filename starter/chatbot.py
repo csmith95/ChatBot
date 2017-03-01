@@ -11,6 +11,7 @@ import math
 import re
 import numpy as np
 import sys
+import collections
 from movielens import ratings
 from random import randint
 from operator import itemgetter
@@ -41,10 +42,12 @@ class Chatbot:
       self.read_data()
       self.mean_center()
       self.p = PorterStemmer()
-      self.sentimentDict = {} #movie to +/-1 , like/dislike
-      self.titleDict = self.createTitleDict() #Movie ID to [title, genre]
+      self.wordToSentimentDict = collections.defaultdict(lambda: 0) # built using sentiment.txt (Ex: 'hate' --> -1)
+      self.buildWordToSentimentDict()
+      self.sentimentDict = {} # movie to +/-1 , like/dislike
+      self.titleDict = self.createTitleDict() # Movie ID to [title, genre]
       self.state = 'generating'
-      self.recommendations = [] #list of top 5 movie rec IDs
+      self.recommendations = [] # list of top 5 movie rec IDs
 
     #############################################################################
     # 1. WARM UP REPL
@@ -113,7 +116,7 @@ class Chatbot:
         # print self.sentimentDict
 
 
-        if len(self.sentimentDict) < 5: #user hasnt entered 5 movies yet
+        if len(self.sentimentDict) < 3: #user hasnt entered 5 movies yet
             request = 'Anotha one.'
             confirm = 'Dats coo. '
             if len(self.sentimentDict) == 0: #first movie from user
@@ -158,18 +161,19 @@ class Chatbot:
     def extractMovies(self, input) :
         return re.findall(r'\"(.+?)\"', input)
 
-    # Returns dict from input words to sentiments pos/neg
-    def extractSentiment(self, input, src_file='data/sentiment.txt') :
+    # parses sentiment.txt into a map from word to associated sentiment (+1 or -1)
+    def buildWordToSentimentDict(self):
+      for word, sentiment in csv.reader(file('data/sentiment.txt'), delimiter=',', quoting=csv.QUOTE_MINIMAL):
+        self.wordToSentimentDict[self.p.stem(word)] = 1 if sentiment == 'pos' else -1
+
+    # Returns +1 if input sentiment is positive, otherwise -1
+    def classifyInputSentiment(self, input):
         tokens = self.nonTitleWords(input)
-        tokens = tokens.split()
-        tokenSet = set(tokens)
-        sentimentDict = self.sentiments(src_file, ',', csv.QUOTE_MINIMAL)
-        tokensSentimentDict = {}
-        for word in tokens:
-            word = self.p.stem(word)
-            if word in sentimentDict:
-                tokensSentimentDict[word] = sentimentDict[word]
-        return tokensSentimentDict
+        tokenSet = set(tokens.split())
+        result = 0
+        for token in tokenSet:
+          result += self.wordToSentimentDict[self.p.stem(token)]
+        return 1 if result >= 0 else -1    # assuming it's not good to classify as neutral (0), err on the side of positive review
 
     def nonTitleWords(self, input) :
         length = len(input)
@@ -179,16 +183,6 @@ class Chatbot:
         partTwo = input[index + 1:]
         nonTitleWords = partOne + partTwo
         return nonTitleWords
-
-    # Returns sentiment.txt in dict form
-    def sentiments(self, src_file, delimiter, quoting) :
-        reader = csv.reader(file(src_file), delimiter=delimiter, quoting=quoting)
-        sentimentDict = {}
-        for line in reader:
-            word, sent = line[0], line[1]
-            word = self.p.stem(word)
-            sentimentDict[word] = sent
-        return sentimentDict
 
     #Creates map from ID to movie title as listed in movies.txt [title, genre]
     #Inlcudes titles with format: Matrix, The
@@ -217,11 +211,11 @@ class Chatbot:
 
     #Classifies input as overall positive or negative and stores that in dict with movie ID
     def updateSentimentDict(self, input):
-        binarySent = self.binarizeInputSentiment(input)
+        binarySentiment = self.classifyInputSentiment(input)
         for inputTitle in self.extractMovies(input):
           for id, title in self.titleDict.iteritems():
               if self.matchesTitle(title[0], inputTitle):
-                  self.sentimentDict[id] = binarySent
+                  self.sentimentDict[id] = binarySentiment
 
 
     #Returns true if the inputted title matches the title listed in movies.txt
@@ -258,23 +252,6 @@ class Chatbot:
                 return True
         return False
 
-    #Takes input, looks at sentiment words, computes overall sentiment based on
-    #whether there are mor pos or neg words. returns pos if tie
-    def binarizeInputSentiment(self, input):
-        inputSentDict = {}
-        inputSentDict = self.extractSentiment(input)
-        negSum = 0
-        posSum = 0
-        for word in inputSentDict:
-            if inputSentDict[word] == 'pos':
-                posSum = posSum + 1
-            else:
-                negSum = negSum + 1
-        if negSum > posSum:
-            return -1
-        else:
-            return 1
-
     #Returns list of [movie IDs, title, genre|genre]
     #If movie not found, [NOT_FOUND] appended instead
     def returnIdsTitlesGenres(self, inputTitles):
@@ -287,7 +264,6 @@ class Chatbot:
                 if id == len(self.titleDict) - 1:
                     movieInfo.append(["NOT_FOUND"])
         return movieInfo
-
 
 
 
@@ -312,9 +288,9 @@ class Chatbot:
     def binarize(rating, mean):
       """Modifies the ratings matrix to make all of the ratings binary"""
       result = rating - mean
-      if result > 0.0:
+      if result > 0:
         return 1
-      elif result < 0.0:
+      elif result < 0:
         return -1
       return 0
 
