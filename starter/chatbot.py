@@ -187,7 +187,7 @@ class Chatbot:
         extractedMovies = self.extractMovies(input)
 
 
-        
+
         movieMatches = self.extractMovieMatches(input)
         if DEBUG:
             print movieMatches
@@ -249,7 +249,7 @@ class Chatbot:
     def extractMovieMatches(self, input) :
         movieMatches = {}
         titles = re.findall(r'\"(.+?)\"', input)
-        if titles: #Cases 2, 3
+        if titles: #Cases 1, 2
             for title in titles:
                 movieMatches[title] = self.returnMatches(title)
         return movieMatches
@@ -261,7 +261,7 @@ class Chatbot:
             if self.matchesTitle(title, inputTitle, substringSearch=False):
                 matches.append(title)
         if not matches: #no exact matches, looks for substring matches
-            matches = self.substringMatches(input)
+            matches = self.substringMatches(inputTitle)
         return matches
 
     # confirm that movie was received and implicitly or explicitly convey sentiment
@@ -364,13 +364,13 @@ class Chatbot:
     # Fast and the Furious, The (1955)
     # Fast Five (Fast and the Furious 5, The) (2011)
     # Fast & Furious 6 (Fast and the Furious 6, The) (2013)
-    def substringMatches(self, input) :
+    def substringMatches(self, inputTitle) :
         ambiguousMatches = []
-        titles = re.findall(r'\"(.+?)\"', input)
+        # titles = re.findall(r'\"(.+?)\"', input)
         for listedTitle in self.titleList:
-            for title in titles:
-                if self.matchesTitle(listedTitle, title, substringSearch=True):
-                    ambiguousMatches.append(listedTitle)
+            # for title in titles:
+            if self.matchesTitle(listedTitle, inputTitle, substringSearch=True):
+                ambiguousMatches.append(listedTitle)
         return ambiguousMatches
 
     #If no titles in quotes, searches for the single longest substring that matches a title in the list
@@ -590,11 +590,9 @@ class Chatbot:
             fixedTitle = fixedTitle.lower()
             inputTitle = inputTitle.lower()
             if substringSearch:
-
                 if inputTitle in fixedTitle:
                     # if len(inputTitle) > (len(fixedTitle)*(0.5)):
                     return True
-
             else:
                 if fixedTitle == inputTitle:
                     return True
