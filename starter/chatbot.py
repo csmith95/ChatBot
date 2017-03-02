@@ -51,16 +51,19 @@ make sure rudolfa can handle multiple titles in almost any case
   remember what user inputted
   don't recommend same thing twice
 
+  can you look into changing classifyInputSentiment to handle cases like i loved casino but hated toy story where neither are quoted. Call extractMovies
+    on each segment as extractMovies will only return the single longest substring title
+
 
   ** DONE **
     handle negation and conjunctions
     pending movies -- doesn't let user move on if there are unresolved movies.. unsure about this design but it's what we got
     make yes/no parsing more robust
     refine recommendations if user wants to add more after receiving initial ones
+    identifies movies without quotations using single longest substring technique
 
 
 ** TJ **
-    Identifying movies without quotation marks or perfect capitalization -- longest substring
     disambiguation by year, # in series (roman, normal, and arabic numerals), etc. see rubric
 
 
@@ -87,6 +90,7 @@ class Chatbot:
       self.name = 'Rudolfa'
       self.is_turbo = is_turbo
       self.mode = '(starter) '
+      self.titleList = []
       self.titleDict = self.createTitleDict() # Movie ID to [title, genre]
       self.binarize()
       self.p = PorterStemmer()
@@ -172,6 +176,11 @@ class Chatbot:
         inputtedMoviesInfo = [] #Returns list of [movie id, title, genre|genre]
         inputtedMoviesInfo = self.returnIdsTitlesGenres(extractedMovies)
         numInputtedMovies = len(inputtedMoviesInfo)
+        if numInputtedMovies == 0:
+            ambiguousMatches = self.substringMatches(input)
+            print "DID YOU MEAN ONE OF THESE????"
+            for movie in ambiguousMatches:
+                print color.BLUE + '\n\'' + movie + '\'' + color.END + '\n'
 
         if self.faultyInput():
           # TODO
@@ -180,8 +189,8 @@ class Chatbot:
         if len(self.userPreferencesMap) < MIN_REQUEST_THRESHOLD:
             response = self.notEnoughData()
             return response
-        else:
-            if extractedMovies:
+        # else:
+            # if extractedMovies:
                 # confirm that movie was received and implicitly or explicitly convey sentiment
                 # response =
 
@@ -193,7 +202,7 @@ class Chatbot:
                 # couldn't get good recommendation -- ask for more
                 # self.promptUserPreRec(input, numInputtedMovies)
                 # response +=
-
+        response = 'BLEH'
 
         return response
 
@@ -274,9 +283,60 @@ class Chatbot:
         return response
 
 
+    # Identifying movies without quotation marks or perfect capitalization -- longest substring
     # Returns list of movies entered in input
+    # Only returns movies that are in movies.txt
     def extractMovies(self, input) :
-        return re.findall(r'\"(.+?)\"', input)
+        titles = re.findall(r'\"(.+?)\"', input)
+        if len(titles) == 0:
+            titles = self.searchNoQuotes(input)
+        for title in titles:
+            if self.titleMatches(title) == False:
+                titles.remove(title)
+        return titles
+
+#Want to return list of possibly ambiguous matches as well
+#Currently only finds substrings if title is entered in quotes
+# 'fast and the furious' ->
+    # Fast and the Furious, The (2001)
+    # 2 Fast 2 Furious (Fast and the Furious 2, The) (2003)
+    # Fast and the Furious: Tokyo Drift, The (Fast and the Furious 3, The) (2006)
+    # Fast & Furious (Fast and the Furious 4, The) (2009)
+    # Fast and the Furious, The (1955)
+    # Fast Five (Fast and the Furious 5, The) (2011)
+    # Fast & Furious 6 (Fast and the Furious 6, The) (2013)
+    def substringMatches(self, input) :
+        ambiguousMatches = []
+        titles = re.findall(r'\"(.+?)\"', input)
+        for listedTitle in self.titleList:
+            for title in titles:
+                if self.matchesTitle(listedTitle, title, substringSearch=True):
+                    ambiguousMatches.append(listedTitle)
+        return ambiguousMatches
+
+    #Searches for the single longest substring that matches a title in the list
+    def searchNoQuotes(self, input) :
+        matches = []
+        tokens = input.split()
+        for i in range(0, len(tokens)):
+            testTitle = tokens[i]
+            if self.titleMatches(testTitle):
+                matches.append(testTitle)
+            for j in range(i + 1, len(tokens)):
+                testTitle += ' ' + tokens[j]
+                if self.titleMatches(testTitle):
+                    matches.append(testTitle)
+        if matches:
+            return [max(matches, key=len)]
+        return []
+
+
+    def titleMatches(self, testTitle) :
+        for title in self.titleList:
+            if self.matchesTitle(title, testTitle, substringSearch=False):
+                return True
+        return False
+
 
     # parses sentiment.txt into a map from word to associated sentiment (+1 or -1)
     def buildWordToSentimentDict(self):
@@ -348,6 +408,7 @@ class Chatbot:
     #Inlcudes titles with format: Matrix, The
     def createTitleDict(self):
         self.titles, self.ratings = ratings()
+        self.titleList = [item[0] for item in self.titles]
         titlesGenres = []
         for movie in self.titles: # Create list of movie titles
             title = movie[0]
@@ -357,16 +418,18 @@ class Chatbot:
             idToTitleDict[i] = titlesGenres[i]
         return idToTitleDict
 
+
     # Ex. 'big short, the' --> 'The big short'
     def fixDanglingArticle(self, title):
         article = 'The '
         index = title.find(', The', 0, len(title))
-        if index == -1:
-            index = title.find(', A', 0, len(title))
-            article = 'A '
-        if index == -1:
-            index = title.find(', An', 0, len(title))
         if index != -1:
+            pass
+        elif title.find(', A', 0, len(title)) != -1:
+            index =  title.find(', A', 0, len(title))
+            article = 'A '
+        elif title.find(', An', 0, len(title)) != -1:
+            index = title.find(', An', 0, len(title))
             article = 'An '
         else:
             return title
@@ -394,7 +457,7 @@ class Chatbot:
     def recordSentiment(self, movies, sentiment):
       for inputTitle in movies:
         for id, title in self.titleDict.iteritems():
-          if self.matchesTitle(title[0], inputTitle):
+          if self.matchesTitle(title[0], inputTitle, substringSearch=False):
             if sentiment == 0:
               self.pendingMovies.add(id)
             else:
@@ -427,7 +490,7 @@ class Chatbot:
     # "Legend of 1900, The (a.k.a. The Legend of the Pianist on the Ocean) (Leggenda del pianista sull'oceano) (1998)"
     # "Fast & Furious 6 (Fast and the Furious 6, The) (2013)"
     # "2 Fast 2 Furious (Fast and the Furious 2, The) (2003)"
-    def matchesTitle(self, listedTitle, inputTitle) :
+    def matchesTitle(self, listedTitle, inputTitle, substringSearch) :
         if inputTitle == listedTitle:
             return True
         regexTitles = '(^[\w\s\',:\&¡!\*\]\[\$.-]*)(\([\w\s\',:\&¡!\*\]\[\$.-]*\)\s)?(\([\w\s\',:\&¡!\*\]\[\$.-]*\)\s)?(\([0-9]{4}\)$)?'
@@ -445,14 +508,23 @@ class Chatbot:
             if title[len(title) - 1] == ')':
                 title = title[:-1]
             fixedTitle = self.fixDanglingArticle(title) + ' ' + year
-            if fixedTitle.lower() == inputTitle.lower():
-                return True
-            if fixedTitle.find('The ', 0, 6) == 0:
-                fixedTitle = fixedTitle[4:]
-            if fixedTitle.lower() == inputTitle.lower():
-                return True
-            if fixedTitle[:-7].lower() == inputTitle.lower():
-                return True
+            fixedTitle = fixedTitle.lower()
+            inputTitle = inputTitle.lower()
+            if substringSearch:
+                
+                if inputTitle in fixedTitle:
+                    # if len(inputTitle) > (len(fixedTitle)*(0.4)):
+                    return True
+
+            else:
+                if fixedTitle == inputTitle:
+                    return True
+                if fixedTitle.find('the ', 0, 6) == 0:
+                    fixedTitle = fixedTitle[4:]
+                if fixedTitle == inputTitle:
+                    return True
+                if fixedTitle[:-7] == inputTitle:
+                    return True
         return False
 
     #Returns list of [movie IDs, title, genre|genre]
@@ -461,7 +533,7 @@ class Chatbot:
         movieInfo = []
         for inputTitle in inputTitles:
             for id, info in self.titleDict.iteritems():
-                if self.matchesTitle(info[0], inputTitle):
+                if self.matchesTitle(info[0], inputTitle, substringSearch=False):
                     movieInfo.append([id, info[0], info[1]])
                     break
                 if id == len(self.titleDict) - 1:
