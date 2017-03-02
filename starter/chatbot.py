@@ -86,7 +86,7 @@ class Chatbot:
     global DEBUG, yes, no, negationWords, contrastConjunctions, personalOpinionWords, superWords, containsIntensifier, MIN_REQUEST_THRESHOLD, intensifierWords, \
       superPositivePhrases
 
-    DEBUG = True
+    DEBUG = False
     yes = ['yes', 'ye', 'y', 'sure']
     no = ['no', 'n', 'nah']
     negationWords = ["didn't", "don't", "isn't", 'not', "neither", "hardly", "aren't", 'never']
@@ -119,7 +119,10 @@ class Chatbot:
       self.stemSpecialWords()
       self.shouldGenerateReq = False
       self.firstRec = True
-      self.recentReviews = {}
+      self.recentReviews = collections.defaultdict(lambda: 0)
+      self.movieMatches = []
+      self.disambiguationInProgress = False
+      self.cachedSentiment = 0   # for movie disambiguation
 
     #############################################################################
     # 1. WARM UP REPL
@@ -174,6 +177,13 @@ class Chatbot:
       intensifierWords = map(lambda word: self.p.stem(word), intensifierWords)
       negationWords = map(lambda word: self.p.stem(word), negationWords)
 
+    def getMatchingMovieOptions(self):
+      options = color.RED
+      for index, possibility in enumerate(self.candidateMovies):
+          options += '\n({}) {} \n'.format(index+1, possibility[0])
+      options += color.END
+      return options
+
     def process(self, input):
         """Takes the input string from the REPL and call delegated functions
         that
@@ -183,44 +193,35 @@ class Chatbot:
         if self.is_turbo == True:
             self.mode = '(creative) '
 
+        response = ''
+
         input = self.searchNoQuotes(input) #In case no quotes used around potential title, searches for substring, adds quotes
-        extractedMovies = self.extractMovies(input)
+        disambiguationResponse = self.disambiguate(input)
+        if disambiguationResponse:
+          return disambiguationResponse
+        else:
+          response += self.reactToMovies() # after resolving disambiguation, this will return reaction. if nothing resolved, will return empty
 
-
-
-        movieMatches = self.extractMovieMatches(input)
-        if DEBUG:
-            print movieMatches
-        for movie in movieMatches:
-            if len(movieMatches[movie]) > 1:
-                for possibility in movieMatches[movie]:
-                    print color.RED + '\n\'' + possibility + '\'' + color.END + '\n'
-                return 'Wasn\'t quite sure which movie you mean\'t. Which of the above was it?'
-
-
-
-
-        if extractedMovies:
-          self.updateSentimentDict(input)
-          self.reactToMovies()
+        # *** any code below here can assume disambiguation has been resolved ***
 
         pendingMovies = self.fetchPendingMovieTitlesString()
         if pendingMovies:
           response = "I couldn't quite tell how you feel about " + pendingMovies
-          response += " :(  Please tell me more about these\n"
+          response += " :(  Please tell me a little more.\n"
           return response
 
+        extractedMovies = self.extractMovies(input)
+        if extractedMovies:
+          self.updateSentimentDict(input)
+          response += self.reactToMovies()
 
         if self.faultyInput():
           # TODO -- gracefully handle
           return '<>'
 
-        response = ''
         if len(self.userPreferencesMap) < MIN_REQUEST_THRESHOLD:
-            response = self.notEnoughData()
-
+            response += self.notEnoughData()
         else:
-
             self.shouldShowReq = (self.firstRec or self.affirmative(input) or extractedMovies) and self.freshRecs()
             if self.shouldShowReq:
                 # display good recommendation. Prompt for another movie rating or another recommendation
@@ -232,8 +233,10 @@ class Chatbot:
                 if self.negative(input):
                   return "Guess we're done here. Enter \':quit\' to exit!"
                 # couldn't get good recommendation -- ask for more
-                response = self.promptUserPreRec(input)
+                response += self.promptUserPreRec(input)
 
+
+        print 'User prefs: ', self.userPreferencesMap
         return response
 
 
@@ -252,22 +255,26 @@ class Chatbot:
         if titles: #Cases 1, 2
             for title in titles:
                 movieMatches[title] = self.returnMatches(title)
+        print movieMatches
         return movieMatches
 
     #For each possible title entered, returns list of possible matches inlcuding substring matches
+    # list contains (Title, ID)
     def returnMatches(self, inputTitle) :
         matches = [] #Stores list of matches for every title entered
+        print inputTitle
         for id, title in enumerate(self.titleList):
-            if self.matchesTitle(title, inputTitle, substringSearch=False):
-                matches.append(title)
+          if self.matchesTitle(title, inputTitle, substringSearch=False):
+            matches.append((title, id))
         if not matches: #no exact matches, looks for substring matches
-            matches = self.substringMatches(inputTitle)
+          matches = self.substringMatches(inputTitle)
         return matches
 
     # confirm that movie was received and implicitly or explicitly convey sentiment
     # bonus: reacts stronger to movies that the user really liked
     def reactToMovies(self):
       phrases = []
+      phrase = ''
       for title, sentiment in self.recentReviews.iteritems():
         title = '"' + re.sub(r'\s\([0-9]*\)', '', title) + '"'
         if sentiment == -2:
@@ -275,13 +282,15 @@ class Chatbot:
         if sentiment == 2:
           phrase = superPositivePhrases[randint(0, len(superPositivePhrases)-1)]
         if sentiment == 1:
-          phrase = 'Glad you enjoyed {}. '
+          phrase = 'Glad you enjoyed {}. \n'
         if sentiment == -1:
-          phrase = "A lot of people agree {} was kinda lame.".format(title)
+          phrase = "A lot of people agree {} was kinda lame. \n".format(title)
         phrases += [phrase.format(title)]
 
-      print ''.join(phrases)
       self.recentReviews = {}   # reset dictionary
+
+      reaction = ''.join(phrases)
+      return reaction
 
     # takes any movies that have been mentioned by user w/ neutral sentiment
     # and combines them into a string of the form A, B, C, . . . , or X.
@@ -367,10 +376,10 @@ class Chatbot:
     def substringMatches(self, inputTitle) :
         ambiguousMatches = []
         # titles = re.findall(r'\"(.+?)\"', input)
-        for listedTitle in self.titleList:
+        for index, listedTitle in enumerate(self.titleList):
             # for title in titles:
             if self.matchesTitle(listedTitle, inputTitle, substringSearch=True):
-                ambiguousMatches.append(listedTitle)
+                ambiguousMatches.append((listedTitle, index))
         return ambiguousMatches
 
     #If no titles in quotes, searches for the single longest substring that matches a title in the list
@@ -556,7 +565,10 @@ class Chatbot:
         for segment in splitInput:
           sentiment = self.classifyInputSentiment(segment) if self.containsSentimentWords(segment) else 0
           movies = self.extractMovies(segment)  # extract movies specific to this segment
-          self.recordSentiment(movies, sentiment)
+          if self.disambiguationInProgress:
+            self.cachedSentiment = sentiment
+          else:
+            self.recordSentiment(movies, sentiment)
 
         if DEBUG:
           print 'Split input:', splitInput
@@ -650,6 +662,10 @@ class Chatbot:
       return numerator / math.sqrt(stdU * stdV)
 
 
+  # item- based
+    # binarize entire matrix by an arbitrary number (say, 3)
+    # 
+
     def recommend(self):
       """Generates a list of movies based on the input vector u using
       collaborative filtering"""
@@ -734,6 +750,34 @@ class Chatbot:
       for line in reader:
         users[int(line[0])][int(line[1])] =  float(line[2])
       return title_list, users
+
+
+    def disambiguate(self, input):
+      if self.disambiguationInProgress:
+        try:
+          index = int(input.strip())-1    # since indices shown to user are incremented by 1
+          movie = self.candidateMovies[index]
+          if self.cachedSentiment == 0:
+            self.cachedSentiment = 1         # cop out -- for now, if ambiguous sentiment is with ambigous title, just assume positive
+          self.disambiguationInProgress = False
+          self.recentReviews[movie[0]] = self.cachedSentiment
+          self.userPreferencesMap[movie[1]] = self.cachedSentiment / abs(self.cachedSentiment)    # since we only want to store -1/1 for recommendations instead of the [-2, 2] scale
+          return ''
+        except:
+          return 'Sorry, please enter a number shown below' + self.getMatchingMovieOptions()
+
+
+      allMovieMatches = self.extractMovieMatches(input)
+      self.disambiguationInProgress = False
+      for candidateMovieTuples in allMovieMatches.values():   # (title, id) tuple
+        if len(candidateMovieTuples) > 1:
+          self.candidateMovies = candidateMovieTuples
+          self.disambiguationInProgress = True
+          response = 'Wasn\'t quite sure which movie you meant. Which of the below did you mean?'
+          self.updateSentimentDict(input)
+          return response + self.getMatchingMovieOptions()
+
+      return ''
 
 
 #############################################################################
