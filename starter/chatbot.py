@@ -50,17 +50,10 @@ make sure rudolfa can handle multiple titles in almost any case
     confirmation strings should indicate like/dislike. ex: I liked ____ too! tell me about another movie. OR  glad you enjoyed ___. Anotha one.
   remember what user inputted
   don't recommend same thing twice
-<<<<<<< HEAD
-
-  can you look into changing classifyInputSentiment to handle cases like i loved casino but hated toy story where neither are quoted. Call extractMovies
-    on each segment as extractMovies will only return the single longest substring title
-=======
   refine recommendations
   "If you're binarizing your dataset, then I doubt you can do much behind the scenes to distinguish positive inputs from highly positive inputs.
     What you can do, however, is to demonstrate your bot's understanding through your response i.e. your should output a different, maybe more enthusiastic or
     strongly worded response for a strongly worded input."
->>>>>>> master
-
 
   ** DONE **
     handle negation and conjunctions
@@ -75,6 +68,7 @@ make sure rudolfa can handle multiple titles in almost any case
     disambiguation by year, # in series (roman, normal, and arabic numerals), etc. see rubric
     PROBLEMS:
         if ambiguous title entered, all matches added to sentiment dict
+            #Example "fast and the furious" matches two movies and thus both are entered into sentiment dict incorrectly
 
 
 """
@@ -181,6 +175,18 @@ class Chatbot:
             self.mode = '(creative) '
 
         extractedMovies = self.extractMovies(input)
+
+        #TODO fix problem of multiple matches:
+        #Example "fast and the furious" matches two movies and thus both are entered into sentiment dict incorrectly
+        for movie in extractedMovies:
+            matches = []
+            for id, title in self.titleDict.iteritems():
+              if self.matchesTitle(title[0], movie, substringSearch=False):
+                  matches.append(title[0])
+            if len(matches) > 1:
+                print 'MATCHING MORE THAN ONE MOVIES. BOTH ADDED TO SENTIMENT DICT'
+
+
         if extractedMovies:
           self.updateSentimentDict(input)
           self.reactToMovies()
@@ -497,6 +503,7 @@ class Chatbot:
       for inputTitle in movies:
         for id, title in self.titleDict.iteritems():
           if self.matchesTitle(title[0], inputTitle, substringSearch=False):
+
             if sentiment == 0:
               self.pendingMovies.add(id)
             else:
