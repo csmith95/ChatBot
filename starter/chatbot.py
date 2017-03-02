@@ -41,28 +41,29 @@ class State:
 rubric: https://docs.google.com/spreadsheets/d/1_2Gkaj1eonFr16LXpeAgOdcgH2_uLTmvyCV3lQZFYEI/edit#gid=1926203681
 
 ** Unclaimed **
-refine recommendations if user wants to add more after receiving initial ones
-support user explicitly asking for a recommendation
-handle conjunctions ("I like ___, but hated ____")  ** strategy: split at the conjunction, classify separately
+support user explicitly asking for a recommendation -- "Can you give me a recommendation?"
 make sure rudolfa can handle multiple titles in almost any case
   ex: expand removeTitleWords function to handle multiple titles
   ex: if only some of the movies can't be matched, don't reprompt for all the movies
 
 ** CS **
-  clean up process() logical flow
   item-based collaborative filtering
-  make yes/no parsing more robust
   randomize request/confirm strings
     confirmation strings should indicate like/dislike. ex: I liked ____ too! tell me about another movie. OR  glad you enjoyed ___. Anotha one.
-    handle case when user inputs same movie multiple times with same/diff rating
+  remember what user inputted
+  don't recommend same thing twice
+
 
   ** DONE ** 
     handle negation and conjunctions
-
+    pending movies -- doesn't let user move on if there are unresolved movies.. unsure about this design but it's what we got
+    make yes/no parsing more robust
+    refine recommendations if user wants to add more after receiving initial ones
 
 
 ** TJ **
     Identifying movies without quotation marks or perfect capitalization -- longest substring
+    disambiguation by year, # in series (roman, normal, and arabic numerals), etc. see rubric
 
 
 """
@@ -71,7 +72,7 @@ make sure rudolfa can handle multiple titles in almost any case
 class Chatbot:
     """Simple class to implement the chatbot for PA 6."""
 
-    global DEBUG, yes, no, negationWords, contrastConjunctions, personalOpinionWords, superWords
+    global DEBUG, yes, no, negationWords, contrastConjunctions, personalOpinionWords, superWords, containsSuper, MIN_REQUEST_THRESHOLD
     DEBUG = True
     yes = ['yes', 'ye', 'y', 'sure']
     no = ['no', 'n', 'nah']
@@ -79,6 +80,7 @@ class Chatbot:
     contrastConjunctions = ['but', 'however', 'yet']
     superWords = ['very', 'really', 'extremely', 'super', 'exceptionally', 'incredibly']
     personalOpinionWords = ['I', 'i']
+    MIN_REQUEST_THRESHOLD = 3
 
     #############################################################################
     # `moviebot` is the default chatbot. Change it to your chatbot's name       #
@@ -90,13 +92,14 @@ class Chatbot:
       self.titleDict = self.createTitleDict() # Movie ID to [title, genre]
       self.binarize()
       self.p = PorterStemmer()
-      self.stemSpecialWords()
       self.wordToSentimentDict = collections.defaultdict(lambda: 0) # built using sentiment.txt (Ex: 'hate' --> -1)
       self.buildWordToSentimentDict()
       self.userPreferencesMap = {} # movie to +/-1 , like/dislike
       self.state = State.NEED_INFO
       self.givenRecommendations = set() # list of previously given recs not to be repeated
       self.recommendations = [] # list of top 5 movie rec IDs
+      self.pendingMovies = set()
+      self.stemSpecialWords()
 
     #############################################################################
     # 1. WARM UP REPL
@@ -145,9 +148,10 @@ class Chatbot:
     #############################################################################
 
     def stemSpecialWords(self):
-      specialLists = [personalOpinionWords, superWords, negationWords]
-      for l in specialLists:
-        l = map(lambda word: self.p.stem(word), l)
+      global personalOpinionWords, superWords, negationWords
+      personalOpinionWords = map(lambda word: self.p.stem(word), personalOpinionWords)
+      superWords = map(lambda word: self.p.stem(word), superWords)
+      negationWords = map(lambda word: self.p.stem(word), negationWords)
 
     def process(self, input):
         """Takes the input string from the REPL and call delegated functions
@@ -160,25 +164,59 @@ class Chatbot:
 
         extractedMovies = self.extractMovies(input)
         self.updateSentimentDict(input)
+
+        pendingMovies = self.fetchPendingMovieTitlesString()
+        if pendingMovies:
+          response = "I couldn't quite tell how you feel about " + pendingMovies
+          response += " :(  Please tell me more about these\n"
+          return response
+
         inputtedMoviesInfo = [] #Returns list of [movie id, title, genre|genre]
         inputtedMoviesInfo = self.returnIdsTitlesGenres(extractedMovies)
         numInputtedMovies = len(inputtedMoviesInfo)
 
-        if len(self.userPreferencesMap) < 5:
-            response = self.notEnoughData()
-        else:
-            response = 'Would you like another movie recommendation? (yes/no) Optionally, tell me about another movie to refine my recommendations!'
-            if self.state == State.NEED_INFO:
-                self.popRecommendation()
-            elif self.state == State.GENERATED_RECS:
-                response = self.promptUserPreRec(input, numInputtedMovies)
+        if self.faultyInput():
+          # TODO
+            return '<>'
 
-        if self.state == State.NEED_INFO:
-            response = self.handleInputIssues(inputtedMoviesInfo)
+        if len(self.userPreferencesMap) < MIN_REQUEST_THRESHOLD:
+            response = self.notEnoughData()
+            return response
+        else:
+            if extractedMovies:
+                # confirm that movie was received and implicitly or explicitly convey sentiment
+                # response =
+
+            # if refreshRecs():
+                # displayed good recommendation -- 
+                # response += '\nWould you like another movie recommendation? Optionally, tell me about another movie!'
+
+            # else:
+                # couldn't get good recommendation -- ask for more
+                # self.promptUserPreRec(input, numInputtedMovies)
+                # response +=
+
 
         return response
 
 
+    # TODO
+    def faultyInput(self):
+      return False
+
+    # takes any movies that have been mentioned by user w/ neutral sentiment 
+    # and combines them into a string of the form A, B, C, . . . , or X.
+    # works for any number of pending movies
+    def fetchPendingMovieTitlesString(self):
+      result = [self.titleDict[ID][0] for ID in self.pendingMovies]
+      if not result:
+        return result
+      movieString = ', '.join(result)
+      if len(result) > 1:
+        index =  len(movieString) - len(result[-1])
+        index2 = len(result[-1])
+        movieString = movieString[:index] + 'or ' + movieString[-index2:]
+      return movieString
 
     def handleInputIssues(self, inputtedMoviesInfo) :
         if len(inputtedMoviesInfo) == 0: #user enters no movie titles in quotes
@@ -197,25 +235,36 @@ class Chatbot:
 
 
     def popRecommendation(self) :
-            self.state = State.GENERATED_RECS
-            self.recommendations = self.recommend()
-            rec = self.recommendations.pop(0)
-            title = self.fixDanglingArticle(self.titleDict[rec][0])
-            print color.BOLD + '\nI recommend \'' + title + '\'' + color.END + '\n'
-            self.givenRecommendations.update(rec)
+        rec = self.recommendations.pop(0)
+        title = self.fixDanglingArticle(self.titleDict[rec][0])
+        print color.BOLD + '\nI recommend \'' + title + '\'' + color.END + '\n'
+        self.givenRecommendations.add(rec)
 
+    # slightly more robust at detecting "Yes"
+    def affirmative(self, input):
+      if not input:
+        return
+      token = input[0].lower()
+      return token in yes
+
+    # slightly more robust at detecting "No"
+    def negative(self, input):
+      if not input:
+        return
+      token = input[0].lower()
+      return token in no
 
     def promptUserPreRec(self, input, numInputtedMovies) :
-        response = 'Would you like another movie recommendation? (yes/no) Optionally, tell me about another movie to refine my recommendations!'
-        if 'yes' in input:
+        response = 'Would you like another movie recommendation? Optionally, tell me about another movie to refine my recommendations!'
+        if self.affirmative(input):
             if len(self.recommendations) == 0:
-                response = "Sorry, that was my last recommendation!"
+                response = "Sorry, that was my last recommendation! Tell me more so I can help you find good movies."
             else:
                 rec = self.recommendations.pop(0)
                 title = self.fixDanglingArticle(self.titleDict[rec][0])
                 print color.BOLD + '\nI recommend \'' + title + '\'' + color.END + '\n'
-                self.givenRecommendations.update(rec)
-        elif 'no' in input:
+                self.givenRecommendations.add(rec)
+        elif self.negative(input):
             response = "Guess we're done here. Enter \':quit\' to exit!"
         else: # Begin recommendation refinement
             if numInputtedMovies == 0: #no additonal movie from user
@@ -236,12 +285,21 @@ class Chatbot:
       for word, sentiment in csv.reader(file('data/sentiment.txt'), delimiter=',', quoting=csv.QUOTE_MINIMAL):
         self.wordToSentimentDict[self.p.stem(word)] = 1 if sentiment == 'pos' else -1
 
+      # hardcode these cases because the training data blows for these words
+      self.wordToSentimentDict['fun'] = 1
+      self.wordToSentimentDict['cool'] = 1
 
     def getMultiplier(self, searchWords, segment, mult):
       for word in searchWords:
         if word in segment:
           return mult
       return 1
+
+    def containsSuper(window):
+      for word in window:
+        if word in superWords:
+          return True
+      return False
 
     # Returns +1 if input sentiment is positive, otherwise -1
     def classifyInputSentiment(self, input):
@@ -250,6 +308,7 @@ class Chatbot:
         result = 0
         input = self.nonTitleWords(input)
         splitInput = self.splitOnConstrastingConjunctions(input)
+        window = []   # contains last couple words entered -- for applying superWord multiplier
         for segment in splitInput:
           segment = set(segment.split())
           multiplier = 1
@@ -258,19 +317,25 @@ class Chatbot:
           for token in segment:
             stemmed = self.p.stem(token)
             sentiment = self.wordToSentimentDict[stemmed] * multiplier
-            print sentiment
-            if stemmed in superWords:
-              sentiment *= 2          # super words count double
+
+            if containsSuper(window):
+              sentiment *= 2      # super words count double
+
+            if len(window) == 2:
+              window.pop(0)
+            window.append(stemmed)
+
             result += sentiment
  
         if '!' in input:    # '!' is more likely to occur in positive reviews
-          result += 2
+          result += 1
 
         if DEBUG:
           print 'Split input inside classifySentiment: ', splitInput
           print 'Overall result: ', result
 
-        return -1 if result <= 0 else 1    # assuming it's not good to classify as neutral (0), err on the side of negative review to handle ellipsis (see rubric)
+        # need to handle ellipsis case somehow
+        return -1 if result <= 0 else 1    # err on side of negative review so that ellipsis shit works
 
     def nonTitleWords(self, input):
         length = len(input)
@@ -310,12 +375,29 @@ class Chatbot:
       for conjunction in contrastConjunctions:
         if conjunction in input:
           return input.split(conjunction)
-
       return [input]
+
+    def containsSentimentWords(self, input):
+      for token in input.split():
+        token = self.p.stem(token)
+        if token in self.wordToSentimentDict:
+          return True
+      return False
+
+    # TODO: disambiguation by year, # in series (roman, normal, and arabic numerals), etc. see rubric
+    def recordSentiment(self, movies, sentiment):
+      for inputTitle in movies:
+        for id, title in self.titleDict.iteritems():
+          if self.matchesTitle(title[0], inputTitle):
+            if sentiment == 0:
+              self.pendingMovies.add(id)
+            else:
+              if id in self.pendingMovies:      # update set of movie IDs our bot is confused about
+                self.pendingMovies.remove(id)
+              self.userPreferencesMap[id] = sentiment
 
     # Classifies input as overall positive or negative and stores that in dict with movie ID
     def updateSentimentDict(self, input):
-
         # split on any conjunctions that suggest contrasting sentiment. only handles splitting on 1 contrast conjunction
         splitInput = [input]
         allMovies = self.extractMovies(input)
@@ -323,20 +405,10 @@ class Chatbot:
           splitInput = self.splitOnConstrastingConjunctions(input)
 
         # classify the segments separately
-        uncertainList = []  # movies that couldn't be classified correctly
         for segment in splitInput:
-          binarySentiment = self.classifyInputSentiment(segment)
-          movies = self.extractedMovies(segment)
-
-          if binarySentiment == 0: 
-            uncertainList += movies   # handle uncertain sentiment by reprompting in process()
-            self.state = State.PENDING_MOVIE_RATING
-            continue
-
-          for inputTitle in movies:
-            for id, title in self.titleDict.iteritems():
-                if self.matchesTitle(title[0], inputTitle):
-                    self.userPreferencesMap[id] = binarySentiment
+          binarySentiment = self.classifyInputSentiment(segment) if self.containsSentimentWords(segment) else 0
+          movies = self.extractMovies(segment)  # extract movies specific to this segment
+          self.recordSentiment(movies, binarySentiment)
 
         if DEBUG:
           print 'Split input:', splitInput
@@ -429,7 +501,7 @@ class Chatbot:
         # if DEBUG:
         #   print 'user: %s \t sim: %s' % (user, similarity)
 
-      unseenMovies = list(set(bestFitRatingMap.keys()).difference(set(ratingMap.keys())))
+      unseenMovies = list(set(bestFitRatingMap.keys()).difference(set(ratingMap.keys())).difference(self.givenRecommendations))
       topFive = [movieID for movieID in sorted(unseenMovies, key = lambda movieID : bestFitRatingMap[movieID])][-5:]
 
       if DEBUG:
