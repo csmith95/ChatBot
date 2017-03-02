@@ -12,7 +12,7 @@ import re
 import numpy as np
 import sys
 import collections
-from movielens import ratings
+from movielens import titles
 from random import randint
 from operator import itemgetter
 
@@ -50,6 +50,7 @@ make sure rudolfa can handle multiple titles in almost any case
     confirmation strings should indicate like/dislike. ex: I liked ____ too! tell me about another movie. OR  glad you enjoyed ___. Anotha one.
   remember what user inputted
   don't recommend same thing twice
+  refine recommendations
 
 
   ** DONE ** 
@@ -78,7 +79,7 @@ class Chatbot:
     contrastConjunctions = ['but', 'however', 'yet']
     superWords = ['very', 'really', 'extremely', 'super', 'exceptionally', 'incredibly']
     personalOpinionWords = ['I', 'i']
-    MIN_REQUEST_THRESHOLD = 3
+    MIN_REQUEST_THRESHOLD = 2
 
     #############################################################################
     # `moviebot` is the default chatbot. Change it to your chatbot's name       #
@@ -87,6 +88,7 @@ class Chatbot:
       self.name = 'Rudolfa'
       self.is_turbo = is_turbo
       self.mode = '(starter) '
+      self.ratings = {}
       self.titleDict = self.createTitleDict() # Movie ID to [title, genre]
       self.binarize()
       self.p = PorterStemmer()
@@ -98,6 +100,8 @@ class Chatbot:
       self.recommendations = [] # list of top 5 movie rec IDs
       self.pendingMovies = set()
       self.stemSpecialWords()
+      self.shouldGenerateReq = False
+      self.firstRec = True
 
     #############################################################################
     # 1. WARM UP REPL
@@ -161,7 +165,8 @@ class Chatbot:
             self.mode = '(creative) '
 
         extractedMovies = self.extractMovies(input)
-        self.updateSentimentDict(input)
+        if extractedMovies:
+          self.updateSentimentDict(input)
 
         pendingMovies = self.fetchPendingMovieTitlesString()
         if pendingMovies:
@@ -169,31 +174,35 @@ class Chatbot:
           response += " :(  Please tell me more about these\n"
           return response
 
-        inputtedMoviesInfo = [] #Returns list of [movie id, title, genre|genre]
-        inputtedMoviesInfo = self.returnIdsTitlesGenres(extractedMovies)
-        numInputtedMovies = len(inputtedMoviesInfo)
+        inputtedMoviesInfo = self.returnIdsTitlesGenres(extractedMovies) # Returns list of [movie id, title, genre|genre]
 
         if self.faultyInput():
           # TODO
             return '<>'
 
+        response = ''
         if len(self.userPreferencesMap) < MIN_REQUEST_THRESHOLD:
-            response = self.notEnoughData()
-            return response
+            return self.notEnoughData()
         else:
+
             if extractedMovies:
                 # confirm that movie was received and implicitly or explicitly convey sentiment
-                # response =
+                response = 'Got these movies: ' + ''.join(extractedMovies) + '\n'
 
-            # if refreshRecs():
-                # displayed good recommendation -- 
-                # response += '\nWould you like another movie recommendation? Optionally, tell me about another movie!'
+            self.shouldShowReq = (self.firstRec or self.affirmative(input) or extractedMovies) and self.freshRecs()
+            if self.shouldShowReq:
+                # display good recommendation. Prompt for another movie rating or another recommendation
+                self.popRecommendation()
+                response += 'Would you like another movie recommendation? Optionally, tell me about another movie!\n'
+                self.shouldShowReq = False
+                self.firstRec = False
+            else:
+                if self.negative(input):
+                  return "Guess we're done here. Enter \':quit\' to exit!"
 
-            # else:
                 # couldn't get good recommendation -- ask for more
-                # self.promptUserPreRec(input, numInputtedMovies)
-                # response +=
-
+                self.promptUserPreRec(input)
+                response += "Sorry, couldn't find a good recommendation. Can you tell me about more movies?"
 
         return response
 
@@ -233,6 +242,8 @@ class Chatbot:
 
 
     def popRecommendation(self) :
+        if not self.recommendations:
+          return
         rec = self.recommendations.pop(0)
         title = self.fixDanglingArticle(self.titleDict[rec][0])
         print color.BOLD + '\nI recommend \'' + title + '\'' + color.END + '\n'
@@ -241,37 +252,23 @@ class Chatbot:
     # slightly more robust at detecting "Yes"
     def affirmative(self, input):
       if not input:
-        return
+        return False
       token = input[0].lower()
       return token in yes
 
     # slightly more robust at detecting "No"
     def negative(self, input):
       if not input:
-        return
+        return False
       token = input[0].lower()
       return token in no
 
-    def promptUserPreRec(self, input, numInputtedMovies) :
-        response = 'Would you like another movie recommendation? Optionally, tell me about another movie to refine my recommendations!'
-        if self.affirmative(input):
-            if len(self.recommendations) == 0:
-                response = "Sorry, that was my last recommendation! Tell me more so I can help you find good movies."
-            else:
-                rec = self.recommendations.pop(0)
-                title = self.fixDanglingArticle(self.titleDict[rec][0])
-                print color.BOLD + '\nI recommend \'' + title + '\'' + color.END + '\n'
-                self.givenRecommendations.add(rec)
-        elif self.negative(input):
-            response = "Guess we're done here. Enter \':quit\' to exit!"
-        else: # Begin recommendation refinement
-            if numInputtedMovies == 0: #no additonal movie from user
-                self.state = State.NEED_INFO
-                request = 'Let\'s refine my recommendations then. Please tell me about an additional movie you liked or didn\'t like.'
-                response = self.mode + request
-            else:
-                self.popRecommendation()
-        return response
+    def promptUserPreRec(self, input) :
+
+        if self.affirmative(input) and len(self.recommendations) == 0:
+          return "Sorry, that was my last recommendation! Tell me more so I can help you find good movies."
+
+        return 'Would you like another movie recommendation? Optionally, tell me about another movie to refine my recommendations!'
 
 
     # Returns list of movies entered in input
@@ -347,7 +344,7 @@ class Chatbot:
     #Creates map from ID to movie title as listed in movies.txt [title, genre]
     #Inlcudes titles with format: Matrix, The
     def createTitleDict(self):
-        self.titles, self.ratings = ratings()
+        self.titles, self.originalRatings = self.loadData()
         titlesGenres = []
         for movie in self.titles: # Create list of movie titles
             title = movie[0]
@@ -461,14 +458,24 @@ class Chatbot:
         return movieInfo
 
 
-
     #############################################################################
     # 3. Movie Recommendation helper functions                                  #
     #############################################################################
 
+
+    def freshRecs(self):
+        if len(self.recommendations) > 0:
+          return True
+
+        self.recommendations = self.recommend()
+        if DEBUG:
+          print 'Recommendations: ', self.recommendations
+        return self.recommendations > 0
+
+
     def binarize(self):
       """Modifies the ratings matrix to make all of the ratings binary"""
-      for user, ratingMap in self.ratings.iteritems():
+      for user, ratingMap in self.originalRatings.iteritems():
         mean = sum(ratingMap.values()) / float(len(ratingMap.values()))
         self.ratings[user] = {movie: -1 if rating - mean < 0 else 1 for movie, rating in ratingMap.iteritems()}
 
@@ -487,26 +494,31 @@ class Chatbot:
       """Generates a list of movies based on the input vector u using
       collaborative filtering"""
 
-      bestFitRatingMap = None
       score = 0.0
       bestFitUser = None
       for user, ratingMap in self.ratings.iteritems():
         similarity = self.dot(self.userPreferencesMap, ratingMap)
         if similarity > score:
           score = similarity
-          bestFitRatingMap = ratingMap
           bestFitUser = user
-        # if DEBUG:
-        #   print 'user: %s \t sim: %s' % (user, similarity)
+        if DEBUG:
+          print 'user: %s \t sim: %s' % (user, similarity)
 
-      unseenMovies = list(set(bestFitRatingMap.keys()).difference(set(ratingMap.keys())).difference(self.givenRecommendations))
-      topFive = [movieID for movieID in sorted(unseenMovies, key = lambda movieID : bestFitRatingMap[movieID])][-5:]
+      if score <= 0:
+        print ':('
+        return []
 
-      if DEBUG:
-        print 'User prefs: ', self.userPreferencesMap
-        print 'Best fit user: ', bestFitUser
-        # print bestFitRatingMap
-        print 'Top five: ', topFive
+      bestFitRatingMap = self.originalRatings[bestFitUser]
+      candidateMovies = set(bestFitRatingMap.keys()).difference(set(self.userPreferencesMap.keys()))  # unseen movies
+      candidateMovies = list(candidateMovies.difference(self.givenRecommendations)) # unseen & unrecommended movies
+      topFive = [movieID for movieID in sorted(candidateMovies, key = lambda movieID : bestFitRatingMap[movieID], reverse=True) if self.ratings[bestFitUser][movieID] == 1][:5]
+
+      # if DEBUG:
+        # print 'Candidate movies: ', candidateMovies
+        # print 'Best fit user: ', bestFitUser
+        # print 'Best fit rating map: ', bestFitRatingMap
+        # print 'Top five: ', topFive
+        # print 'Ratings: ', self.ratings[bestFitUser]
 
       return topFive
 
@@ -544,6 +556,25 @@ class Chatbot:
 
     def bot_name(self):
       return self.name
+
+
+    def loadData(self, src_filename='data/ratings.txt', delimiter='%', header=False, quoting=csv.QUOTE_MINIMAL):
+      title_list = titles()
+      user_id_set = set()
+      with open(src_filename, 'r') as f:
+          content = f.readlines()
+          for line in content:
+              user_id = int(line.split(delimiter)[0])
+              if user_id not in user_id_set:
+                  user_id_set.add(user_id)
+      num_users = len(user_id_set)
+      num_movies = len(title_list)
+
+      users = collections.defaultdict(lambda: {})
+      reader = csv.reader(file(src_filename), delimiter=delimiter, quoting=quoting)
+      for line in reader:
+        users[int(line[0])][int(line[1])] =  float(line[2])
+      return title_list, users
 
 
 #############################################################################
