@@ -65,13 +65,12 @@ if bot doesn't recognize title, rubric says "use fake title"...? wtf is this
     handle negation and conjunctions
     pending movies -- doesn't let user move on if there are unresolved movies.. unsure about this design but it's what we got
     refine recommendations if user wants to add more after receiving initial ones
-    identifies movies without quotations using single longest substring technique
+    searchNoQuotes identifies movies without quotations using single longest substring technique
+        returns input with newly inserted quotes for title to be extracted as normal
     distininguishes positive inputs from highly positive inputs and same for negative -- bot gives stronger confirmation response
 
 
 ** TJ **
-    if movie is not in quotes, seek confirmation from user
-      -- good idea. also enclose title in quotations in the original input before passing to updateSentimentDict so that removeTitleWords will work
     disambiguation by year, # in series (roman, normal, and arabic numerals), etc. see rubric
     PROBLEMS:
         if ambiguous title entered, all matches added to sentiment dict
@@ -184,18 +183,10 @@ class Chatbot:
         if self.is_turbo == True:
             self.mode = '(creative) '
 
+        input = self.searchNoQuotes(input) #In case no quotes used around potential title, searches for substring, adds quotes
         extractedMovies = self.extractMovies(input)
-
-        #TODO fix problem of multiple matches:
-        #Example "fast and the furious" matches two movies and thus both are entered into sentiment dict incorrectly
-        for movie in extractedMovies:
-            matches = []
-            for id, title in self.titleDict.iteritems():
-              if self.matchesTitle(title[0], movie, substringSearch=False):
-                  matches.append(title[0])
-            if len(matches) > 1:
-                print 'MATCHING MORE THAN ONE MOVIES. BOTH ADDED TO SENTIMENT DICT'
-
+        movieMatches = self.extractMovieMatches(input)
+        print movieMatches
 
         if extractedMovies:
           self.updateSentimentDict(input)
@@ -206,14 +197,6 @@ class Chatbot:
           response = "I couldn't quite tell how you feel about " + pendingMovies
           response += " :(  Please tell me more about these\n"
           return response
-
-        inputtedMoviesInfo = self.returnIdsTitlesGenres(extractedMovies)
-        numInputtedMovies = len(inputtedMoviesInfo)
-        if numInputtedMovies == 0:
-            ambiguousMatches = self.substringMatches(input)
-            print "DID YOU MEAN ONE OF THESE????"
-            for movie in ambiguousMatches:
-                print color.BLUE + '\n\'' + movie + '\'' + color.END + '\n'
 
 
         if self.faultyInput():
@@ -246,6 +229,28 @@ class Chatbot:
     def faultyInput(self):
       return False
 
+    # Takes all titles in quotes and returns a dict of them to a list of their
+    # possible matches. If no exact matches exist, looks for substrings
+    # 1) User enters substring in quotes
+    # 2) user enters full title in quotes
+    # user enters full title no quotes taken care of previously
+    def extractMovieMatches(self, input) :
+        movieMatches = {}
+        titles = re.findall(r'\"(.+?)\"', input)
+        if titles: #Cases 2, 3
+            for title in titles:
+                movieMatches[title] = self.returnMatches(title)
+        return movieMatches
+
+    #For each possible title entered, returns list of possible matches inlcuding substring matches
+    def returnMatches(self, inputTitle) :
+        matches = [] #Stores list of matches for every title entered
+        for id, title in enumerate(self.titleList):
+            if self.matchesTitle(title, inputTitle, substringSearch=False):
+                matches.append(title)
+        if not matches: #no exact matches, looks for substring matches
+            matches = self.substringMatches(input)
+        return matches
 
     # confirm that movie was received and implicitly or explicitly convey sentiment
     # bonus: reacts stronger to movies that the user really liked
@@ -326,16 +331,15 @@ class Chatbot:
         return "Sorry, couldn't find a good recommendation. Can you tell me about more movies?"
 
 
-    # Identifying movies without quotation marks or perfect capitalization -- longest substring
     # Returns list of movies entered in input
-    # Only returns movies that are in movies.txt
+    # Only returns movies that match a title in movies.txt
     def extractMovies(self, input) :
         titles = re.findall(r'\"(.+?)\"', input)
-        if len(titles) == 0:
-            titles = self.searchNoQuotes(input)
         for title in titles:
             if self.titleMatches(title) == False:
                 titles.remove(title)
+        if DEBUG:
+            print 'extractMovies() - titles entered that match movies in db: %s' % titles
         return titles
 
 #Want to return list of possibly ambiguous matches as well
@@ -357,21 +361,28 @@ class Chatbot:
                     ambiguousMatches.append(listedTitle)
         return ambiguousMatches
 
-    #Searches for the single longest substring that matches a title in the list
+    #If no titles in quotes, searches for the single longest substring that matches a title in the list
+    #Returns input with newly inserted quotes around title
     def searchNoQuotes(self, input) :
-        matches = []
-        tokens = input.split()
-        for i in range(0, len(tokens)):
-            testTitle = tokens[i]
-            if self.titleMatches(testTitle):
-                matches.append(testTitle)
-            for j in range(i + 1, len(tokens)):
-                testTitle += ' ' + tokens[j]
+        titles = re.findall(r'\"(.+?)\"', input)
+        if not titles:
+            matches = []
+            tokens = input.split()
+            for i in range(0, len(tokens)):
+                testTitle = tokens[i]
                 if self.titleMatches(testTitle):
                     matches.append(testTitle)
-        if matches:
-            return [max(matches, key=len)]
-        return []
+                for j in range(i + 1, len(tokens)):
+                    testTitle += ' ' + tokens[j]
+                    if self.titleMatches(testTitle):
+                        matches.append(testTitle)
+            if matches:
+                title = max(matches, key=len)
+                index = input.find(title, 0, len(input))
+                input = input[:index] + '\"' + title + '\" ' + input[index + len(title) + 1:]
+                if DEBUG:
+                    print 'searchNoQuotes() - changed input to %s' % input
+        return input
 
 
     def titleMatches(self, testTitle) :
@@ -569,7 +580,7 @@ class Chatbot:
             if substringSearch:
 
                 if inputTitle in fixedTitle:
-                    # if len(inputTitle) > (len(fixedTitle)*(0.4)):
+                    # if len(inputTitle) > (len(fixedTitle)*(0.5)):
                     return True
 
             else:
