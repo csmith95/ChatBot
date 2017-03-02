@@ -33,9 +33,10 @@ class State:
   NEED_INFO = 0
   GENERATED_RECS = 1
   EMPTY_RECS = 2
-
+  PENDING_MOVIE_RATING = 3
 
 """                                    **** TODO *****
+
 
 rubric: https://docs.google.com/spreadsheets/d/1_2Gkaj1eonFr16LXpeAgOdcgH2_uLTmvyCV3lQZFYEI/edit#gid=1926203681
 
@@ -55,7 +56,13 @@ make sure rudolfa can handle multiple titles in almost any case
     confirmation strings should indicate like/dislike. ex: I liked ____ too! tell me about another movie. OR  glad you enjoyed ___. Anotha one.
     handle case when user inputs same movie multiple times with same/diff rating
 
+  ** DONE ** 
+    handle negation and conjunctions
+
+
+
 ** TJ **
+    Identifying movies without quotation marks or perfect capitalization -- longest substring
 
 
 """
@@ -64,8 +71,14 @@ make sure rudolfa can handle multiple titles in almost any case
 class Chatbot:
     """Simple class to implement the chatbot for PA 6."""
 
-    global DEBUG
+    global DEBUG, yes, no, negationWords, contrastConjunctions, personalOpinionWords, superWords
     DEBUG = True
+    yes = ['yes', 'ye', 'y', 'sure']
+    no = ['no', 'n', 'nah']
+    negationWords = ["didn't", "don't", "isn't", 'not', "neither", "hardly", "aren't", 'never']
+    contrastConjunctions = ['but', 'however', 'yet']
+    superWords = ['very', 'really', 'extremely', 'super', 'exceptionally', 'incredibly']
+    personalOpinionWords = ['I', 'i']
 
     #############################################################################
     # `moviebot` is the default chatbot. Change it to your chatbot's name       #
@@ -77,6 +90,7 @@ class Chatbot:
       self.titleDict = self.createTitleDict() # Movie ID to [title, genre]
       self.binarize()
       self.p = PorterStemmer()
+      self.stemSpecialWords()
       self.wordToSentimentDict = collections.defaultdict(lambda: 0) # built using sentiment.txt (Ex: 'hate' --> -1)
       self.buildWordToSentimentDict()
       self.userPreferencesMap = {} # movie to +/-1 , like/dislike
@@ -129,6 +143,11 @@ class Chatbot:
     #############################################################################
     # 2. Modules 2 and 3: extraction and transformation                         #
     #############################################################################
+
+    def stemSpecialWords(self):
+      specialLists = [personalOpinionWords, superWords, negationWords]
+      for l in specialLists:
+        l = map(lambda word: self.p.stem(word), l)
 
     def process(self, input):
         """Takes the input string from the REPL and call delegated functions
@@ -217,16 +236,43 @@ class Chatbot:
       for word, sentiment in csv.reader(file('data/sentiment.txt'), delimiter=',', quoting=csv.QUOTE_MINIMAL):
         self.wordToSentimentDict[self.p.stem(word)] = 1 if sentiment == 'pos' else -1
 
+
+    def getMultiplier(self, searchWords, segment, mult):
+      for word in searchWords:
+        if word in segment:
+          return mult
+      return 1
+
     # Returns +1 if input sentiment is positive, otherwise -1
     def classifyInputSentiment(self, input):
-        tokens = self.nonTitleWords(input)
-        tokenSet = set(tokens.split())
-        result = 0
-        for token in tokenSet:
-          result += self.wordToSentimentDict[self.p.stem(token)]
-        return 1 if result >= 0 else -1    # assuming it's not good to classify as neutral (0), err on the side of positive review
 
-    def nonTitleWords(self, input) :
+        # split again because sometimes user expresses contrasting opinions about same movie(s)
+        result = 0
+        input = self.nonTitleWords(input)
+        splitInput = self.splitOnConstrastingConjunctions(input)
+        for segment in splitInput:
+          segment = set(segment.split())
+          multiplier = 1
+          multiplier *= self.getMultiplier(personalOpinionWords, segment, 3)  # weight 'I' more than other segments b/c indicates personal opinion
+          multiplier *= self.getMultiplier(negationWords, segment, -1)       # negationWords make everything imply opposite sentiment (rough but mad decent)
+          for token in segment:
+            stemmed = self.p.stem(token)
+            sentiment = self.wordToSentimentDict[stemmed] * multiplier
+            print sentiment
+            if stemmed in superWords:
+              sentiment *= 2          # super words count double
+            result += sentiment
+ 
+        if '!' in input:    # '!' is more likely to occur in positive reviews
+          result += 2
+
+        if DEBUG:
+          print 'Split input inside classifySentiment: ', splitInput
+          print 'Overall result: ', result
+
+        return -1 if result <= 0 else 1    # assuming it's not good to classify as neutral (0), err on the side of negative review to handle ellipsis (see rubric)
+
+    def nonTitleWords(self, input):
         length = len(input)
         index = input.find('\"', 0, length)
         partOne = input[:-(length-index)]
@@ -248,7 +294,7 @@ class Chatbot:
             idToTitleDict[i] = titlesGenres[i]
         return idToTitleDict
 
-    # Ex. 'big short, the'
+    # Ex. 'big short, the' --> 'The big short'
     def fixDanglingArticle(self, title):
         index = title.find(', The', 0, len(title))
         if index == -1:
@@ -260,13 +306,41 @@ class Chatbot:
             title = 'The ' + partOne + partTwo
         return title
 
-    #Classifies input as overall positive or negative and stores that in dict with movie ID
+    def splitOnConstrastingConjunctions(self, input):
+      for conjunction in contrastConjunctions:
+        if conjunction in input:
+          return input.split(conjunction)
+
+      return [input]
+
+    # Classifies input as overall positive or negative and stores that in dict with movie ID
     def updateSentimentDict(self, input):
-        binarySentiment = self.classifyInputSentiment(input)
-        for inputTitle in self.extractMovies(input):
-          for id, title in self.titleDict.iteritems():
-              if self.matchesTitle(title[0], inputTitle):
-                  self.userPreferencesMap[id] = binarySentiment
+
+        # split on any conjunctions that suggest contrasting sentiment. only handles splitting on 1 contrast conjunction
+        splitInput = [input]
+        allMovies = self.extractMovies(input)
+        if len(allMovies) > 1:   # don't split if user is talking about the same movie throughout
+          splitInput = self.splitOnConstrastingConjunctions(input)
+
+        # classify the segments separately
+        uncertainList = []  # movies that couldn't be classified correctly
+        for segment in splitInput:
+          binarySentiment = self.classifyInputSentiment(segment)
+          movies = self.extractedMovies(segment)
+
+          if binarySentiment == 0: 
+            uncertainList += movies   # handle uncertain sentiment by reprompting in process()
+            self.state = State.PENDING_MOVIE_RATING
+            continue
+
+          for inputTitle in movies:
+            for id, title in self.titleDict.iteritems():
+                if self.matchesTitle(title[0], inputTitle):
+                    self.userPreferencesMap[id] = binarySentiment
+
+        if DEBUG:
+          print 'Split input:', splitInput
+          print 'Updated sentiment dict: ', self.userPreferencesMap
 
 
     #Returns true if the inputted title matches the title listed in movies.txt
