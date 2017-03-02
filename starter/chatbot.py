@@ -71,6 +71,7 @@ if bot doesn't recognize title, rubric says "use fake title"...? wtf is this
 
 ** TJ **
     if movie is not in quotes, seek confirmation from user
+      -- good idea. also enclose title in quotations in the original input before passing to updateSentimentDict so that removeTitleWords will work
     disambiguation by year, # in series (roman, normal, and arabic numerals), etc. see rubric
     PROBLEMS:
         if ambiguous title entered, all matches added to sentiment dict
