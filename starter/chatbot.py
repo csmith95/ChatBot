@@ -185,8 +185,20 @@ class Chatbot:
 
         input = self.searchNoQuotes(input) #In case no quotes used around potential title, searches for substring, adds quotes
         extractedMovies = self.extractMovies(input)
+
+
+        
         movieMatches = self.extractMovieMatches(input)
-        print movieMatches
+        if DEBUG:
+            print movieMatches
+        for movie in movieMatches:
+            if len(movieMatches[movie]) > 1:
+                for possibility in movieMatches[movie]:
+                    print color.RED + '\n\'' + possibility + '\'' + color.END + '\n'
+                return 'Wasn\'t quite sure which movie you mean\'t. Which of the above was it?'
+
+
+
 
         if extractedMovies:
           self.updateSentimentDict(input)
