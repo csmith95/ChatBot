@@ -43,24 +43,30 @@ support user explicitly asking for a recommendation -- "Can you give me a recomm
 make sure rudolfa can handle multiple titles in almost any case
   ex: expand removeTitleWords function to handle multiple titles
   ex: if only some of the movies can't be matched, don't reprompt for all the movies
+if bot doesn't recognize title, rubric says "use fake title"...? wtf is this
 
 ** CS **
-  item-based collaborative filtering
-  randomize request/confirm strings
-    confirmation strings should indicate like/dislike. ex: I liked ____ too! tell me about another movie. OR  glad you enjoyed ___. Anotha one.
-  remember what user inputted
-  don't recommend same thing twice
-  refine recommendations
-  "If you're binarizing your dataset, then I doubt you can do much behind the scenes to distinguish positive inputs from highly positive inputs.
-    What you can do, however, is to demonstrate your bot's understanding through your response i.e. your should output a different, maybe more enthusiastic or
-    strongly worded response for a strongly worded input."
+
+  (1) refine recommendations
+        -- clarify user-based approach
+        -- item-based collaborative filtering
+  (2) randomize request/confirm strings
+        confirmation strings should indicate like/dislike. ex: I liked ____ too! tell me about another movie. OR  glad you enjoyed ___. Anotha one.
+          -- sometimes more emotional than others depending on how much user liked it
+          -- strategy: define a bunch of lists of strings that can be formatted. See reactToMovies() superPositivePhrases as an example
+          -- refactor to build response instead of printing reactions. this means using += with response and not overwriting it later
+  (3) identify/respond to 2 emotions
+  (4) respond to arbitrary input
+        -- add to faultyInput() method
+        -- careful not to include emotion, asking for rec, or giving movie (w or w/o quotes) as arbitrary input because those require specific responses
+
 
   ** DONE **
     handle negation and conjunctions
     pending movies -- doesn't let user move on if there are unresolved movies.. unsure about this design but it's what we got
-    make yes/no parsing more robust
     refine recommendations if user wants to add more after receiving initial ones
     identifies movies without quotations using single longest substring technique
+    distininguishes positive inputs from highly positive inputs and same for negative -- bot gives stronger confirmation response
 
 
 ** TJ **
@@ -77,7 +83,9 @@ make sure rudolfa can handle multiple titles in almost any case
 class Chatbot:
     """Simple class to implement the chatbot for PA 6."""
 
-    global DEBUG, yes, no, negationWords, contrastConjunctions, personalOpinionWords, superWords, containsIntensifier, MIN_REQUEST_THRESHOLD, intensifierWords
+    global DEBUG, yes, no, negationWords, contrastConjunctions, personalOpinionWords, superWords, containsIntensifier, MIN_REQUEST_THRESHOLD, intensifierWords, \
+      superPositivePhrases
+
     DEBUG = True
     yes = ['yes', 'ye', 'y', 'sure']
     no = ['no', 'n', 'nah']
@@ -87,6 +95,7 @@ class Chatbot:
     superWords = ['love', 'hate', 'favorite', 'worst', 'awful', 'fantastic', 'amazing', 'beautiful']
     personalOpinionWords = ['I', 'i']
     MIN_REQUEST_THRESHOLD = 2
+    superPositivePhrases = ['I agree {} is an unbelievable movie!! \n']
 
     #############################################################################
     # `moviebot` is the default chatbot. Change it to your chatbot's name       #
@@ -227,8 +236,7 @@ class Chatbot:
                 if self.negative(input):
                   return "Guess we're done here. Enter \':quit\' to exit!"
                 # couldn't get good recommendation -- ask for more
-                self.promptUserPreRec(input)
-                response += "Sorry, couldn't find a good recommendation. Can you tell me about more movies?"
+                response = self.promptUserPreRec(input)
 
         return response
 
@@ -247,9 +255,9 @@ class Chatbot:
         if sentiment == -2:
           phrase = 'Damn, sorry to hear how much you hated {} :( \n'
         if sentiment == 2:
-          phrase = 'I agree {} is an unbelievable movie!! \n'
+          phrase = superPositivePhrases[randint(0, len(superPositivePhrases)-1)]
         if sentiment == 1:
-          phrase = 'Glad you enjoyed {}. '.format(title)
+          phrase = 'Glad you enjoyed {}. '
         if sentiment == -1:
           phrase = "A lot of people agree {} was kinda lame.".format(title)
         phrases += [phrase.format(title)]
@@ -314,7 +322,7 @@ class Chatbot:
         if self.affirmative(input) and len(self.recommendations) == 0:
           return "Sorry, that was my last recommendation! Tell me more so I can help you find good movies."
 
-        return 'Would you like another movie recommendation? Optionally, tell me about another movie to refine my recommendations!'
+        return "Sorry, couldn't find a good recommendation. Can you tell me about more movies?"
 
 
     # Identifying movies without quotation marks or perfect capitalization -- longest substring
@@ -600,7 +608,7 @@ class Chatbot:
         self.recommendations = self.recommend()
         if DEBUG:
           print 'Recommendations: ', self.recommendations
-        return self.recommendations > 0
+        return len(self.recommendations) > 0
 
 
     def binarize(self):
