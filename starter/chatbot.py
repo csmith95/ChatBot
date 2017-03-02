@@ -52,7 +52,7 @@ make sure rudolfa can handle multiple titles in almost any case
   don't recommend same thing twice
 
 
-  ** DONE ** 
+  ** DONE **
     handle negation and conjunctions
     pending movies -- doesn't let user move on if there are unresolved movies.. unsure about this design but it's what we got
     make yes/no parsing more robust
@@ -186,7 +186,7 @@ class Chatbot:
                 # response =
 
             # if refreshRecs():
-                # displayed good recommendation -- 
+                # displayed good recommendation --
                 # response += '\nWould you like another movie recommendation? Optionally, tell me about another movie!'
 
             # else:
@@ -202,7 +202,7 @@ class Chatbot:
     def faultyInput(self):
       return False
 
-    # takes any movies that have been mentioned by user w/ neutral sentiment 
+    # takes any movies that have been mentioned by user w/ neutral sentiment
     # and combines them into a string of the form A, B, C, . . . , or X.
     # works for any number of pending movies
     def fetchPendingMovieTitlesString(self):
@@ -324,7 +324,7 @@ class Chatbot:
             window.append(stemmed)
 
             result += sentiment
- 
+
         if '!' in input:    # '!' is more likely to occur in positive reviews
           result += 1
 
@@ -359,14 +359,22 @@ class Chatbot:
 
     # Ex. 'big short, the' --> 'The big short'
     def fixDanglingArticle(self, title):
+        article = 'The '
         index = title.find(', The', 0, len(title))
         if index == -1:
-            return title
+            index = title.find(', A', 0, len(title))
+            article = 'A '
+        if index == -1:
+            index = title.find(', An', 0, len(title))
+        if index != -1:
+            article = 'An '
         else:
-            length = len(title)
-            partOne = title[:-(length-index)]
-            partTwo = title[(index + 5):]
-            title = 'The ' + partOne + partTwo
+            return title
+
+        length = len(title)
+        partOne = title[:-(length-index)]
+        partTwo = title[(index + len(article) + 1):]
+        title = article + partOne + partTwo
         return title
 
     def splitOnConstrastingConjunctions(self, input):
