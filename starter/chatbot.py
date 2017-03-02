@@ -64,8 +64,11 @@ make sure rudolfa can handle multiple titles in almost any case
 
 
 ** TJ **
+    if movie is not in quotes, seek confirmation from user
     disambiguation by year, # in series (roman, normal, and arabic numerals), etc. see rubric
-
+    PROBLEMS:
+        if ambiguous title entered, all matches added to sentiment dict
+        
 
 """
 
@@ -511,7 +514,7 @@ class Chatbot:
             fixedTitle = fixedTitle.lower()
             inputTitle = inputTitle.lower()
             if substringSearch:
-                
+
                 if inputTitle in fixedTitle:
                     # if len(inputTitle) > (len(fixedTitle)*(0.4)):
                     return True
