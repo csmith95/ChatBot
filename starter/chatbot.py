@@ -32,8 +32,6 @@ class color:
 class State:
   NEED_INFO = 0
   GENERATED_RECS = 1
-  EMPTY_RECS = 2
-  PENDING_MOVIE_RATING = 3
 
 """                                    **** TODO *****
 
