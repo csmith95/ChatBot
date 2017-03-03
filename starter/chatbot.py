@@ -242,6 +242,7 @@ class Chatbot:
         response = self.mode
 
         input = self.searchNoQuotes(input) #In case no quotes used around potential title, searches for substring, adds quotes
+        print input
         disambiguationResponse = self.disambiguate(input)
         if disambiguationResponse:
           return disambiguationResponse
@@ -257,6 +258,7 @@ class Chatbot:
           return response
 
         extractedMovies = self.extractMovies(input)
+        print extractedMovies
         if extractedMovies:
           self.updateSentimentDict(input)
           response += self.reactToMovies()
@@ -266,10 +268,12 @@ class Chatbot:
         self.disambiguationJustResolved = False
 
 
+
         if self.preferencesRecorded < 3:
             response += self.notEnoughData()
         else:
             self.shouldShowReq = (self.firstRec or self.affirmative(input) or extractedMovies) and self.freshRecs()
+            print self.shouldShowReq
             if self.shouldShowReq:
                 # display good recommendation. Prompt for another movie rating or another recommendation
                 self.popRecommendation()
@@ -282,7 +286,7 @@ class Chatbot:
                 # couldn't get good recommendation -- ask for more
                 response += self.promptUserPreRec(input)
 
-        print 'User prefs: ', self.userPreferencesVector
+        print 'Number of prefs recorded: ', self.preferencesRecorded
         return response
 
 
@@ -309,6 +313,7 @@ class Chatbot:
     # 2) user enters full title in quotes
     # user enters full title no quotes taken care of previously
     def extractMovieMatches(self, input) :
+        global movieMatchesEmpty
         movieMatches = {}
         titles = re.findall(r'\"(.+?)\"', input)
         if titles: #Cases 1, 2
@@ -609,8 +614,6 @@ class Chatbot:
               if id in self.pendingMovies:      # update set of movie IDs our bot is confused about
                 self.pendingMovies.remove(id)
               self.recentReviews[title[0]] = sentiment    # record -2, -1, 1, or 2 so bot can confirm classification w/ user inside reactToMovies()
-              print 'len: ', len(self.userPreferencesVector)
-              print 'id: ', id
               self.preferencesRecorded += 1 if self.userPreferencesVector[id] == 0 else 0   # increment if movie hasn't been rated by user yet
               self.userPreferencesVector[id] = sentiment / abs(sentiment)
 
@@ -740,35 +743,21 @@ class Chatbot:
 
 
     def sim(self, u, v):
-      num = sum(val1 * val2 for val1, val2 in zip(u, v))
-      denom = math.sqrt(sum(x**2 for x in u)) * math.sqrt(sum(x**2 for x in v))
-      if denom == 0:  
-        return 0.0    # avoid division-by-zero err
-      return num / denom
-
-    def computeWeightedSum(self, simMap):
-      return sum(self.userPreferencesVector[id]*weight for id, weight in simMap.iteritems())
-
-    def compileSimilarityMap(self, ratings, neighborMoviesMap):
-      # compile map of similarities from neighborMovieID --> sim using rated movies as neighbors
-      return {id : self.sim(ratings, ratingVector) for id, ratingVector in neighborMoviesMap.iteritems()}
+      return np.dot(u, v) / (np.sqrt(np.dot(u, u)) * np.sqrt(np.dot(v, v)))
 
 
     def recommend(self):
       """Generates a list of movies based on the input vector u using
       collaborative filtering"""
 
-
       neighborMoviesMap = {id : ratings for id, ratings in enumerate(self.ratings) if self.userPreferencesVector[id] != 0}
       unratedMovies = {id : ratings for id, ratings in enumerate(self.ratings) if self.userPreferencesVector[id] == 0}
       extrapolatedRatings = {}
       for unratedID, ratings in unratedMovies.iteritems():
-        simMap = self.compileSimilarityMap(ratings, neighborMoviesMap)
-        extrapolatedRatings[unratedID] = self.computeWeightedSum(simMap)
+        simMap = {id : self.sim(ratings, ratingVector) for id, ratingVector in neighborMoviesMap.iteritems()}
+        extrapolatedRatings[unratedID] = sum(self.userPreferencesVector[id]*weight for id, weight in simMap.iteritems()) # weighted sum
 
-
-      topRatings = [id for id, rating in sorted(extrapolatedRatings.iteritems(), key=lambda x:x[1])][-5:]
-      print 'TOP RATINGS: ', topRatings
+      topRatings = [id for id, rating in sorted(extrapolatedRatings.iteritems(), key=lambda x:x[1], reverse=True)][:5]
       return topRatings
 
 
@@ -822,9 +811,11 @@ class Chatbot:
           self.disambiguationInProgress = False
           self.disambiguationJustResolved = True
           self.recentReviews[movie[0]] = self.cachedSentiment
+          self.preferencesRecorded += 1 if self.userPreferencesVector[movie[1]] == 0 else 0   # increment if movie hasn't been rated by user yet
           self.userPreferencesVector[movie[1]] = self.cachedSentiment / abs(self.cachedSentiment)    # since we only want to store -1/1 for recommendations instead of the [-2, 2] scale
           return ''
         except:
+          print 'err'
           return enterNumBelowResponses[randint(0,len(enterNumBelowResponses)-1)] + self.getMatchingMovieOptions()
 
 
