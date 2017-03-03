@@ -274,6 +274,8 @@ class Chatbot:
 
         extractedMovies = self.extractMovies(input)
         if extractedMovies:
+          if extractedMovies[0] == 'NOT_FOUND':
+            return 'Sorry, I don\'t recognize the movie "{}" :( Guess I\'m not as smart as I thought. '.format(extractedMovies[1])
           self.updateSentimentDict(input)
           response += self.reactToMovies()
           if self.pendingMovie:
@@ -452,7 +454,7 @@ class Chatbot:
         titles = re.findall(r'\"(.+?)\"', input)
         for title in titles:
             if self.titleMatches(title) == False:
-                titles.remove(title)
+                return ['NOT_FOUND', title]
         if DEBUG:
             print 'extractMovies() - titles entered that match movies in db: %s' % titles
         return titles
@@ -663,9 +665,6 @@ class Chatbot:
           else:
             self.recordSentiment(movies, sentiment)
 
-        if DEBUG:
-          print 'Split input:', splitInput
-          print 'Updated sentiment vector: ', self.userPreferencesVector
 
 
     #Returns true if the inputted title matches the title listed in movies.txt
