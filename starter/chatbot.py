@@ -67,12 +67,11 @@ if bot doesn't recognize title, rubric says "use fake title"...? wtf is this
     (2) randomize request/confirm strings
     handles basic emotions
     "1" matches to 187
+    i like "the matrix" vs i like the "matrix". --> no quotes works
+
 
 ** TJ **
     disambiguation by year, # in series (roman, normal, and arabic numerals), etc. see rubric
-    Need to handle multiple titles no quotes
-    Detect and respond to NEGATION of emotions
-    i like "the matrix" vs i like the matrix. --> no quotes works
 
 """
 
@@ -83,7 +82,7 @@ class Chatbot:
     global DEBUG, yes, no, negationWords, contrastConjunctions, personalOpinionWords, superWords, containsIntensifier, MIN_REQUEST_THRESHOLD, intensifierWords, \
       superPositivePhrases, superNegativePhrases, positivePhrases, negativePhrases, additionalRequests, initialRequests, greetings, goodbyes, tellMeMoreRequests, \
       anotherRecOrRefinePrompts, exitResponses, noMovieDetectedResponses, lastRecResponses, cantRecommendMovieResponses, enterNumBelowResponses, disambiguateMovieResponses, \
-      angerWords, sadWords, happyWords, generalReponses, movieMatchesEmpty, helloWords
+      angerWords, sadWords, happyWords, generalReponses, movieMatchesEmpty, helloWords, fillerWords
     DEBUG = False
     yes = ['yes', 'ye', 'y', 'sure']
     no = ['no', 'n', 'nah']
@@ -118,8 +117,9 @@ class Chatbot:
     initialRequests = ['Please tell me about a movie you liked or didn\'t like. ',
                        'Tell me about a movie you either liked or didn\'t like. ',
                        'What\'s a movie you liked or didn\'t like? ']
+    fillerWords = ['Ummm ', 'Uhhh ', 'Mmmm ']
     greetings = ['Suh dude.',
-                 'Heyyyyyyy',
+                 'Heyyyyyyy.',
                  'How\'s it hangin, big fellah?',
                  'Howdy, partner.',
                  'Hola muchacho.']
@@ -235,7 +235,6 @@ class Chatbot:
         response = self.mode
 
         input = self.searchNoQuotes(input) #In case no quotes used around potential title, searches for substring, adds quotes
-        print input
         disambiguationResponse = self.disambiguate(input)
         if disambiguationResponse:
           return disambiguationResponse
@@ -251,7 +250,6 @@ class Chatbot:
           return response
 
         extractedMovies = self.extractMovies(input)
-        print extractedMovies
         if extractedMovies:
           self.updateSentimentDict(input)
           response += self.reactToMovies()
@@ -294,8 +292,8 @@ class Chatbot:
             response = 'I\'m glad that you\'re happy. Since you\'re in such a good mood, '
             response += initialRequests[randint(0, len(initialRequests)-1)].lower()
         elif not set(input.lower().split()).isdisjoint(helloWords):
-            response = 'Um yeah, hello to you too. '
-            response += initialRequests[randint(0, len(initialRequests)-1)].lower()
+            response = fillerWords[randint(0,len(fillerWords)-1)] + greetings[randint(0,len(greetings)-1)].lower()
+            response += ' ' + initialRequests[randint(0, len(initialRequests)-1)]
         else:
             response = generalReponses[randint(0, len(generalReponses)-1)]
         return response
@@ -412,6 +410,7 @@ class Chatbot:
 
     # Returns list of movies entered in input
     # Only returns movies that match a title in movies.txt
+    #PROBLEM: returning "matrix" when input is "matrix", but not returning "the matrix" when input is "the matrix"
     def extractMovies(self, input) :
         titles = re.findall(r'\"(.+?)\"', input)
         for title in titles:
@@ -645,8 +644,6 @@ class Chatbot:
         alternateTitles = re.findall(regexTitles, listedTitle)
         year = alternateTitles[0][3]
         for title in alternateTitles[0][:-1]:
-            # if listedTitle == 'I Am Cuba (Soy Cuba/Ya Kuba) (1964)':
-            #     print title
             title = title.strip()
             if title == '':
                 continue
@@ -669,7 +666,8 @@ class Chatbot:
                 if fixedTitle == inputTitle:
                     return True
                 if fixedTitle.find('the ', 0, 6) == 0:
-                    fixedTitle = fixedTitle[4:]
+                    if fixedTitle[4:] == inputTitle:
+                        return True
                 if fixedTitle == inputTitle:
                     return True
                 if len(year) == 6:
@@ -680,14 +678,14 @@ class Chatbot:
                         if fixedTitle[:-9] == inputTitle and len(fixedTitle) > 11:
                             return True
                     except:
-                        return False
+                        continue
                 else:
                     try:
                         num = int(fixedTitle[:-1])
                         if fixedTitle[:-2] == inputTitle and len(fixedTitle) > 4:
                             return True
                     except:
-                        return False
+                        continue
         return False
 
     #Returns list of [movie IDs, title, genre|genre]
