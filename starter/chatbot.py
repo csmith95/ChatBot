@@ -81,8 +81,8 @@ class Chatbot:
     """Simple class to implement the chatbot for PA 6."""
 
     global DEBUG, yes, no, negationWords, contrastConjunctions, personalOpinionWords, superWords, containsIntensifier, MIN_REQUEST_THRESHOLD, intensifierWords, \
-      superPositivePhrases, superNegativePhrases, positivePhrases, negativePhrases, additionalRequests, initialRequests
-
+      superPositivePhrases, superNegativePhrases, positivePhrases, negativePhrases, additionalRequests, initialRequests, greetings, goodbyes, tellMeMoreRequests, \
+      anotherRecOrRefinePrompts, exitResponses, noMovieDetectedResponses, lastRecResponses, cantRecommendMovieResponses, enterNumBelowResponses, disambiguateMovieResponses
     DEBUG = False
     yes = ['yes', 'ye', 'y', 'sure']
     no = ['no', 'n', 'nah']
@@ -92,6 +92,7 @@ class Chatbot:
     superWords = ['love', 'hate', 'favorite', 'worst', 'awful', 'fantastic', 'amazing', 'beautiful']
     personalOpinionWords = ['I', 'i']
     MIN_REQUEST_THRESHOLD = 2
+
     superPositivePhrases = ['I agree {} is an unbelievable movie!! ',
                             'Yeah, {} was absolutely fantastic! ',
                             'You\'re so right. {} was definitely a great movie! ']
@@ -110,7 +111,44 @@ class Chatbot:
     initialRequests = ['Please tell me about a movie you liked or didn\'t like. ',
                        'Okay tell me about a movie you either liked or didn\'t like. ',
                        'What\'s a movie you liked or didn\'t like? ']
-
+    greetings = ['Suh dude.',
+                 'Haiiiiiiiiii',
+                 'How\'s it hangin, big fellah?',
+                 'Howdy, partner.',
+                 'Hola muchacho.',
+                 'Whats up, fucker.',
+                 'Yo, niqqqqqa.']
+    goodbyes = ['See ya in a while crocodile :*',
+                'Catch ya later alligator ;)',
+                'Adios bitchacho.',
+                'Alright. Fuck off then.']
+    tellMeMoreRequests = [' :(  Please tell me a little more.\n',
+                          ' Do you mind telling me a little more?\n',
+                          ' How do you feel about that movie?\n']
+    anotherRecOrRefinePrompts = ['Would you like another movie recommendation? Optionally, tell me about another movie!\n',
+                                 'Do you want another recommendation? You can also tell me about another movie.\n',
+                                 'Should I give you another recommendation? If you want, you can tell me about another movie.\n']
+    exitResponses = ['Guess we\'re done here. Enter \':quit\' to exit!',
+                     'Okay then! Enter \':quit\' to exit!',
+                     'Fine, leave me then! Enter \':quit\' to exit!']
+    noMovieDetectedResponses = ['Please tell me about a movie. Remember to use double quotes around its title.',
+                                'Can you tell me about a movie? Please use double quotes around its title!',
+                                'Tell me about a movie you like/dislike. Make sure you use double quotes around its title.']
+    dontRecognizeMovieResponses = ['Don\'t think I know that movie. Please try telling me about a different one.',
+                                   'Hmmm. I don\'t recognize that movie. Can you try telling me about a different one?',
+                                   'I\'ve never heard of that movie before. Please try telling me about another movie.']
+    lastRecResponses = ['Sorry, that was my last recommendation! Tell me more so I can help you find good movies.',
+                        'Unforunately, that was my last recommendation. If you tell me more, I can think of other recommendations!',
+                        'I\'m out of recommendations. You can tell me more if you still need more recommendations!']
+    cantRecommendMovieResponses = ['Sorry, couldn\'t find a good recommendation. Can you tell me about more movies?',
+                                   'I was unable to recommend a good movie! Please tell me about more movies.',
+                                   'Sorry man, I can\'t offer a good recommendation. You should tell me about more movies.']
+    enterNumBelowResponses = ['Sorry, please enter a number shown below',
+                              'Please enter one of the numbers below (Example: \'1\')',
+                              'Can you please enter one of the numbers shown below?']
+    disambiguateMovieResponses = ['Wasn\'t quite sure which movie you meant. Which of the below did you mean?',
+                                  'Not quite sure which movie you\'re talking about. Which of the below did you mean?',
+                                  'Hey, I actually don\'t know which movie you\'re referring to. Which of the below did you mean?']
 
     #############################################################################
     # `moviebot` is the default chatbot. Change it to your chatbot's name       #
@@ -145,40 +183,12 @@ class Chatbot:
 
     def greeting(self):
       """chatbot greeting message"""
-      r = randint(0,6)
-      messages = {
-        0 : 'Suh dude.',
-        1 : 'Haiiiiiiiiii',
-        2 : 'How\'s it hangin, big fellah?',
-        3 : 'Howdy, partner.',
-        4 : 'Hola muchacho.',
-        5 : 'Whats up, fucker.',
-        6 : 'Yo, niqqqqqa.'
-      }
-      greeting_message = messages[r] + ' I\'m ' + self.name + '! I\'m going to recommend a movie for you. First I will ask you about your taste in movies. Tell me about a movie that you have seen.'
-
-      #############################################################################
-      #                             END OF YOUR CODE                              #
-      #############################################################################
-
+      greeting_message = greetings[randint(0,len(greetings)-1)] + ' I\'m ' + self.name + '! I\'m going to recommend a movie for you. First I will ask you about your taste in movies. Tell me about a movie that you have seen.'
       return greeting_message
 
     def goodbye(self):
       """chatbot goodbye message"""
-
-      r = randint(0,4)
-      messages = {
-        0 : 'See ya in a while crocodile :*',
-        1 : 'Catch ya later alligator ;)',
-        3 : 'Adios bitchacho.',
-        4 : 'Alright. Fuck off then.'
-      }
-      goodbye_message = messages[r]
-
-      #############################################################################
-      #                             END OF YOUR CODE                              #
-      #############################################################################
-
+      goodbye_message = goodbyes[randint(0,len(goodbyes)-1)]
       return goodbye_message
 
     #############################################################################
@@ -221,7 +231,7 @@ class Chatbot:
         pendingMovies = self.fetchPendingMovieTitlesString()
         if pendingMovies:
           response = "I couldn't quite tell how you feel about " + pendingMovies
-          response += " :(  Please tell me a little more.\n"
+          response += tellMeMoreRequests[randint(0, len(tellMeMoreRequests)-1)]
           return response
 
         extractedMovies = self.extractMovies(input)
@@ -240,12 +250,12 @@ class Chatbot:
             if self.shouldShowReq:
                 # display good recommendation. Prompt for another movie rating or another recommendation
                 self.popRecommendation()
-                response += 'Would you like another movie recommendation? Optionally, tell me about another movie!\n'
+                response += anotherRecOrRefinePrompts[randint(0,len(anotherRecOrRefinePrompts)-1)]
                 self.shouldShowReq = False
                 self.firstRec = False
             else:
                 if self.negative(input):
-                  return "Guess we're done here. Enter \':quit\' to exit!"
+                  return exitResponses[randint(0,len(exitResponses)-1)]
                 # couldn't get good recommendation -- ask for more
                 response += self.promptUserPreRec(input)
 
@@ -269,7 +279,9 @@ class Chatbot:
         if titles: #Cases 1, 2
             for title in titles:
                 movieMatches[title] = self.returnMatches(title)
-        print movieMatches
+        if DEBUG:
+            print "movieMatches:"
+            print movieMatches
         return movieMatches
 
     #For each possible title entered, returns list of possible matches inlcuding substring matches
@@ -279,7 +291,7 @@ class Chatbot:
         print inputTitle
         for id, title in enumerate(self.titleList):
           if self.matchesTitle(title, inputTitle, substringSearch=False):
-            matches.append((title, id))
+            matches.append((title, id, "EXACT"))
         if not matches: #no exact matches, looks for substring matches
           matches = self.substringMatches(inputTitle)
         return matches
@@ -322,15 +334,15 @@ class Chatbot:
 
     def handleInputIssues(self, inputtedMoviesInfo) :
         if len(inputtedMoviesInfo) == 0: #user enters no movie titles in quotes
-            return self.mode + 'Please tell me about a movie. Remember to use double quotes around its title.'
+            return noMovieDetectedResponses[randint(0,len(noMovieDetectedResponses)-1)]
         if ['NOT_FOUND'] in inputtedMoviesInfo: #user enters a title not in movies.txt
-            return self.mode + 'Don\'t think I know that movie. Please try telling me about a different one.'
+            return dontRecognizeMovieResponses[randint(0,len(dontRecognizeMovieResponses)-1)]
 
 
     def notEnoughData(self) :
         request = additionalRequests[randint(0, len(additionalRequests)-1)]
         if len(self.userPreferencesMap) == 0: # first movie from user
-            request = initialRequests[randint(0, len(initialRequests)-1)]'
+            request = initialRequests[randint(0, len(initialRequests)-1)]
         return request
 
 
@@ -359,9 +371,9 @@ class Chatbot:
     def promptUserPreRec(self, input) :
 
         if self.affirmative(input) and len(self.recommendations) == 0:
-          return "Sorry, that was my last recommendation! Tell me more so I can help you find good movies."
+          return lastRecResponses[randint(0,len(lastRecResponses)-1)]
 
-        return "Sorry, couldn't find a good recommendation. Can you tell me about more movies?"
+        return cantRecommendMovieResponses[randint(0,len(cantRecommendMovieResponses)-1)]
 
 
     # Returns list of movies entered in input
@@ -391,7 +403,7 @@ class Chatbot:
         for index, listedTitle in enumerate(self.titleList):
             # for title in titles:
             if self.matchesTitle(listedTitle, inputTitle, substringSearch=True):
-                ambiguousMatches.append((listedTitle, index))
+                ambiguousMatches.append((listedTitle, index, "SUBSTRING"))
         return ambiguousMatches
 
     #If no titles in quotes, searches for the single longest substring that matches a title in the list
@@ -600,6 +612,8 @@ class Chatbot:
         alternateTitles = re.findall(regexTitles, listedTitle)
         year = alternateTitles[0][3]
         for title in alternateTitles[0][:-1]:
+            # if listedTitle == 'I Am Cuba (Soy Cuba/Ya Kuba) (1964)':
+            #     print title
             title = title.strip()
             if title == '':
                 continue
@@ -615,8 +629,9 @@ class Chatbot:
             inputTitle = inputTitle.lower()
             if substringSearch:
                 if inputTitle in fixedTitle:
-                    # if len(inputTitle) > (len(fixedTitle)*(0.5)):
-                    return True
+                    if len(inputTitle) > (len(fixedTitle)*(0.5)):
+                        if len(fixedTitle) > 10:
+                            return True
             else:
                 if fixedTitle == inputTitle:
                     return True
@@ -624,10 +639,22 @@ class Chatbot:
                     fixedTitle = fixedTitle[4:]
                 if fixedTitle == inputTitle:
                     return True
-                if fixedTitle[:-7] == inputTitle:
-                    return True
-                if fixedTitle[:-9] == inputTitle:
-                    return True
+                if len(year) == 6:
+                    if fixedTitle[:-7] == inputTitle:
+                        return True
+                    try:
+                        num = int(fixedTitle[len(fixedTitle) - 8])
+                        if fixedTitle[:-9] == inputTitle:
+                            return True
+                    except:
+                        return False
+                else:
+                    try:
+                        num = int(fixedTitle[:-1])
+                        if fixedTitle[:-2] == inputTitle:
+                            return True
+                    except:
+                        return False
         return False
 
     #Returns list of [movie IDs, title, genre|genre]
@@ -778,7 +805,7 @@ class Chatbot:
           self.userPreferencesMap[movie[1]] = self.cachedSentiment / abs(self.cachedSentiment)    # since we only want to store -1/1 for recommendations instead of the [-2, 2] scale
           return ''
         except:
-          return 'Sorry, please enter a number shown below' + self.getMatchingMovieOptions()
+          return enterNumBelowResponses[randint(0,len(enterNumBelowResponses)-1)] + self.getMatchingMovieOptions()
 
 
       allMovieMatches = self.extractMovieMatches(input)
@@ -787,7 +814,7 @@ class Chatbot:
         if len(candidateMovieTuples) > 1:
           self.candidateMovies = candidateMovieTuples
           self.disambiguationInProgress = True
-          response = 'Wasn\'t quite sure which movie you meant. Which of the below did you mean?'
+          response = disambiguateMovieResponses[randint(0,len(disambiguateMovieResponses)-1)]
           self.updateSentimentDict(input)
           return response + self.getMatchingMovieOptions()
 
