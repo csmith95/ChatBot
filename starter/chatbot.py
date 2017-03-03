@@ -167,8 +167,6 @@ class Chatbot:
     #############################################################################
     def __init__(self, is_turbo=False):
       self.name = 'Rudolfa'
-      self.is_turbo = is_turbo
-      self.mode = '(starter) '
       self.titleList = []
       self.ratings = None
       self.userPreferencesVector = [] # +/-1, index is movieID
@@ -260,7 +258,6 @@ class Chatbot:
         if self.pendingMovie:
           input += ' ' + self.pendingMovie[1]
           self.pendingMovie = None
-
 
         input = self.searchNoQuotes(input) #In case no quotes used around potential title, searches for substring, adds quotes
         disambiguationResponse = self.disambiguate(input)
