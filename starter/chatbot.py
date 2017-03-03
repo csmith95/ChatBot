@@ -83,7 +83,7 @@ class Chatbot:
     global DEBUG, yes, no, negationWords, contrastConjunctions, personalOpinionWords, superWords, containsIntensifier, MIN_REQUEST_THRESHOLD, intensifierWords, \
       superPositivePhrases, superNegativePhrases, positivePhrases, negativePhrases, additionalRequests, initialRequests, greetings, goodbyes, tellMeMoreRequests, \
       anotherRecOrRefinePrompts, exitResponses, noMovieDetectedResponses, lastRecResponses, cantRecommendMovieResponses, enterNumBelowResponses, disambiguateMovieResponses, \
-      angerWords, sadWords, happyWords, generalReponses, movieMatchesEmpty, helloWords
+      angryWords, happyWords, generalReponses, movieMatchesEmpty, helloWords
     DEBUG = False
     yes = ['yes', 'ye', 'y', 'sure']
     no = ['no', 'n', 'nah']
@@ -93,8 +93,7 @@ class Chatbot:
     superWords = ['love', 'hate', 'favorite', 'worst', 'awful', 'fantastic', 'amazing', 'beautiful']
     personalOpinionWords = ['I', 'i']
     MIN_REQUEST_THRESHOLD = 2
-    angerWords = ['angry', 'anger', 'hate', 'mad', 'pissed', 'annoyed', 'bitter', 'enraged', 'furious', 'heated', 'offended']
-    sadWords = ['sad', 'sadden', 'saddened', 'unhappy', 'depressed', 'dismal', 'heartbroken']
+    angryWords = ['angry', 'anger', 'hate', 'mad', 'pissed', 'annoyed', 'bitter', 'enraged', 'furious', 'heated', 'offended', 'upset']
     happyWords = ['happy', 'joyful', 'excited', 'delight', 'delighted', 'thrilled', 'pleased', 'glad', 'jubilant', 'cheerful']
     helloWords = ['hey', 'hi', 'hello']
     movieMatchesEmpty = True
@@ -224,19 +223,42 @@ class Chatbot:
       options += color.END
       return options
 
+    def handleQuestions(self, input):
+      input = input.lower()
+      if input.startswith('can you'):
+        split = input.split()
+        if 'rec' in split or 'recommendation' in split or 'recommend' in split:
+          return 'GIVE_REC'
+        return "Sorry, I can't help ya there. "
+      if input.startswith('what') or input.startswith('how'):
+        return "I'm not really sure, pal. How about these apples: "
+
     def process(self, input):
         """Takes the input string from the REPL and call delegated functions
         that
         1) extract the relevant information and
         2) transform the information into a response to the user
         """
-        if self.is_turbo == True:
-            self.mode = '(creative) '
-        response = self.mode
 
-        if self.pendingMovie and 'it' in input.lower().split():
-          input = re.sub('it', '"{}"'.format(self.pendingMovie[1]), input)
+        response = ''
+        # handle questions like "Can you... " or "What is..."
+        response += self.handleQuestions(input)
+        if response:
+          if response == 'GIVE_REC':
+            if self.freshRecs():
+              response = 'Sure!\n'
+              self.popRecommendation()
+              return response + anotherRecOrRefinePrompts[randint(0, len(anotherRecOrRefinePrompts))-1]
+            else:
+              return cantRecommendMovieResponses[randint(0, len(cantRecommendMovieResponses))-1]
+          return response + initialRequests[randint(0, len(initialRequests))-1]
+
+
+        # if pending movie, just append it to whatever the user inputted and classify it as that
+        if self.pendingMovie:
+          input += ' ' + self.pendingMovie[1]
           self.pendingMovie = None
+
 
         input = self.searchNoQuotes(input) #In case no quotes used around potential title, searches for substring, adds quotes
         disambiguationResponse = self.disambiguate(input)
@@ -247,24 +269,17 @@ class Chatbot:
 
         # *** any code below here can assume disambiguation has been resolved ***
 
-        if self.pendingMovie:
-          response = "I can't quite tell what you thought about {}.".format(self.pendingMovie)
-          response += tellMeMoreRequests[randint(0, len(tellMeMoreRequests)-1)]
-          return response
-
         extractedMovies = self.extractMovies(input)
         if extractedMovies:
           self.updateSentimentDict(input)
           response += self.reactToMovies()
           if self.pendingMovie:
-            response += "I can't quite tell what you thought about {}.".format(self.pendingMovie[1])
-            response += tellMeMoreRequests[randint(0, len(tellMeMoreRequests)-1)]
+            response += 'How did you feel about "{}"?'.format(self.fixDanglingArticle(self.pendingMovie[1]))
             return response
 
         if movieMatchesEmpty and not self.disambiguationJustResolved:
             return self.respondFaultyInput(input)
         self.disambiguationJustResolved = False
-
 
         if self.preferencesRecorded < 3:
             response += self.notEnoughData()
@@ -287,22 +302,50 @@ class Chatbot:
         return response
 
 
+    def gaugeEmotion(self, input, emotionWords):
+      window = []
+      for word in input:
+        if word in emotionWords:
+          for prevWord in window:
+            if prevWord in negationWords:
+              return -1    # user is expressing opposite of emotion
+          return 1 # user is expressing emotion
+        if len(window) == 2:
+          window.pop(0)
+        window.append(word)
+      return 0   # neutral
+
     def respondFaultyInput(self, input) :
-        if not set(input.lower().split()).isdisjoint(angerWords):
-            response = 'I\'m sorry that you\'re angry. If it helps you calm down, '
-            response += initialRequests[randint(0, len(initialRequests)-1)].lower()
-        elif not set(input.lower().split()).isdisjoint(sadWords):
-            response = 'I\'m sorry that you\'re sad. If it makes you feel any better, '
-            response += initialRequests[randint(0, len(initialRequests)-1)].lower()
-        elif not set(input.lower().split()).isdisjoint(happyWords):
+        global angryWords, happyWords, helloWords
+        input = input.lower().split()
+        # first look for emotion
+        happy = self.gaugeEmotion(input, happyWords)
+        if happy != 0:
+          if happy == 1:
             response = 'I\'m glad that you\'re happy. Since you\'re in such a good mood, '
             response += initialRequests[randint(0, len(initialRequests)-1)].lower()
-        elif not set(input.lower().split()).isdisjoint(helloWords):
-            response = 'Um yeah, hello to you too. '
+            return response
+          if happy == -1:
+            return "I'm sorry you're not feeling too good. Let's talk about good movies to cheer ya up! "
+
+        angry = self.gaugeEmotion(input, angryWords)
+        if angry != 0:
+          if angry == 1:
+            response = 'I\'m sorry that you\'re angry. If it helps you calm down, '
             response += initialRequests[randint(0, len(initialRequests)-1)].lower()
-        else:
-            response = generalReponses[randint(0, len(generalReponses)-1)]
-        return response
+            return response
+          if angry == -1:
+            return "Good to hear I haven't upset you. Tell me about some good movies."
+
+        hello = self.gaugeEmotion(input, helloWords)
+        if hello == 1:
+          response = 'Um yeah, hello to you too. '
+          response += initialRequests[randint(0, len(initialRequests)-1)].lower()
+          return response
+
+        # general response
+        return generalReponses[randint(0, len(generalReponses)-1)]
+
 
     # Takes all titles in quotes and returns a dict of them to a list of their
     # possible matches. If no exact matches exist, looks for substrings
@@ -321,6 +364,8 @@ class Chatbot:
             print movieMatches
         if movieMatches:
             movieMatchesEmpty = False
+        else:
+          movieMatchesEmpty = True
         return movieMatches
 
     #For each possible title entered, returns list of possible matches inlcuding substring matches
