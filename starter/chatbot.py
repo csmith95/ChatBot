@@ -542,11 +542,11 @@ class Chatbot:
     def classifyInputSentiment(self, input):
 
         # split again because sometimes user expresses contrasting opinions about same movie(s)
-        result = 0
         input = self.nonTitleWords(input)
         splitInput = self.splitOnConstrastingConjunctions(input)
         window = []   # contains last couple words entered -- for applying superWord multiplier
         for segment in splitInput:
+          result = 0
           segment = segment.split()   # keep it a list to preserve word order, not a set
           multiplier = 1
           multiplier *= self.getMultiplier(personalOpinionWords, segment, 2)  # weight 'I' more than other segments b/c indicates personal opinion
@@ -554,7 +554,8 @@ class Chatbot:
           for token in segment:
             stemmed = self.p.stem(token)
             sentiment = self.wordToSentimentDict[stemmed] * multiplier
-
+            if stemmed == 'thought':
+              continue
             if containsIntensifier(window):
               sentiment *= 2      # super words count double
 
@@ -577,6 +578,7 @@ class Chatbot:
         if result < -6:
           return -2
 
+        print result
         return -1 if result <= 0 else 1    # err on side of negative review so that ellipsis shit works
 
     def nonTitleWords(self, input):
