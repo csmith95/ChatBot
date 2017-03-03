@@ -232,6 +232,7 @@ class Chatbot:
         return "Sorry, I can't help ya there. "
       if input.startswith('what') or input.startswith('how'):
         return "I'm not really sure, pal. How about these apples: "
+      return ''
 
     def process(self, input):
         """Takes the input string from the REPL and call delegated functions
@@ -247,7 +248,7 @@ class Chatbot:
           if response == 'GIVE_REC':
             if self.freshRecs():
               response = 'Sure!\n'
-              self.popRecommendation()
+              response += self.popRecommendation()
               return response + anotherRecOrRefinePrompts[randint(0, len(anotherRecOrRefinePrompts))-1]
             else:
               return cantRecommendMovieResponses[randint(0, len(cantRecommendMovieResponses))-1]
@@ -288,7 +289,7 @@ class Chatbot:
             print self.shouldShowReq
             if self.shouldShowReq:
                 # display good recommendation. Prompt for another movie rating or another recommendation
-                self.popRecommendation()
+                response += self.popRecommendation()
                 response += anotherRecOrRefinePrompts[randint(0,len(anotherRecOrRefinePrompts)-1)]
                 self.shouldShowReq = False
                 self.firstRec = False
@@ -420,8 +421,8 @@ class Chatbot:
           return
         rec = self.recommendations.pop(0)
         title = self.fixDanglingArticle(self.titleDict[rec][0])
-        print color.BOLD + '\nI recommend \'' + title + '\'' + color.END + '\n'
         self.givenRecommendations.add(rec)
+        return color.BOLD + '\nI recommend \'' + title + '\'' + color.END + '\n'
 
     # slightly more robust at detecting "Yes"
     def affirmative(self, input):
@@ -786,7 +787,6 @@ class Chatbot:
         simMap = {id : self.sim(ratings, ratingVector) for id, ratingVector in neighborMoviesMap.iteritems()}
         rating = sum(self.userPreferencesVector[id]*weight for id, weight in simMap.iteritems()) # weighted sum
         if rating > .6:
-          print 'added ', rating
           extrapolatedRatings[unratedID] = rating
 
       topRatings = [id for id, rating in sorted(extrapolatedRatings.iteritems(), key=lambda x:x[1], reverse=True)][:5]
