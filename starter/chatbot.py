@@ -196,6 +196,7 @@ class Chatbot:
       self.recentReviews = collections.defaultdict(lambda: 0)
       self.movieMatches = []
       self.disambiguationInProgress = False
+      self.disambiguationJustResolved = False
       self.cachedSentiment = 0   # for movie disambiguation
 
     #############################################################################
@@ -260,9 +261,9 @@ class Chatbot:
           self.updateSentimentDict(input)
           response += self.reactToMovies()
 
-        if movieMatchesEmpty:
+        if movieMatchesEmpty and not self.disambiguationJustResolved:
             return self.respondFaultyInput(input)
-
+        self.disambiguationJustResolved = False
 
 
         if self.preferencesRecorded < 3:
@@ -280,7 +281,6 @@ class Chatbot:
                   return exitResponses[randint(0,len(exitResponses)-1)]
                 # couldn't get good recommendation -- ask for more
                 response += self.promptUserPreRec(input)
-
 
         print 'User prefs: ', self.userPreferencesVector
         return response
@@ -377,7 +377,7 @@ class Chatbot:
 
     def notEnoughData(self) :
         request = additionalRequests[randint(0, len(additionalRequests)-1)]
-        if len(self.userPreferencesMap) == 0: # first movie from user
+        if len(self.userPreferencesVector) == 0: # first movie from user
             request = initialRequests[randint(0, len(initialRequests)-1)]
         return request
 
@@ -814,11 +814,16 @@ class Chatbot:
     def disambiguate(self, input):
       if self.disambiguationInProgress:
         try:
-          index = int(input.strip())-1    # since indices shown to user are incremented by 1
+          print input.strip()
+          input = re.sub('"', '', input.strip())
+          index = int(input)-1    # since indices shown to user are incremented by 1
+          print 'index: ', index
           movie = self.candidateMovies[index]
+          print 'movie: ', movie
           if self.cachedSentiment == 0:
             self.cachedSentiment = 1         # cop out -- for now, if ambiguous sentiment is with ambigous title, just assume positive
           self.disambiguationInProgress = False
+          self.disambiguationJustResolved = True
           self.recentReviews[movie[0]] = self.cachedSentiment
           self.userPreferencesVector[movie[1]] = self.cachedSentiment / abs(self.cachedSentiment)    # since we only want to store -1/1 for recommendations instead of the [-2, 2] scale
           return ''
