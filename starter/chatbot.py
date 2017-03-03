@@ -704,11 +704,14 @@ class Chatbot:
                 if fixedTitle == inputTitle:
                     return True
                 if fixedTitle.find('the ', 0, 6) == 0:
-                    if fixedTitle[4:] == inputTitle:
-                        return True
-                    if len(year) == 6:
-                        if fixedTitle[4:-7] == inputTitle:
-                            return True
+                    fixedTitle = fixedTitle[4:]
+                if fixedTitle == inputTitle:
+                    return True
+                    # if fixedTitle[4:] == inputTitle:
+                    #     return True
+                    # if len(year) == 6:
+                    #     if fixedTitle[4:-7] == inputTitle:
+                    #         return True
                 punctuation = '.,!?'
                 if len(year) == 6:
                     if fixedTitle[:-7] == inputTitle:
