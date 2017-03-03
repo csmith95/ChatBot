@@ -64,16 +64,12 @@ if bot doesn't recognize title, rubric says "use fake title"...? wtf is this
         returns input with newly inserted quotes for title to be extracted as normal
     distininguishes positive inputs from highly positive inputs and same for negative -- bot gives stronger confirmation response
     toy story disambiguation
+    (2) randomize request/confirm strings
 
 ** TJ **
     disambiguation by year, # in series (roman, normal, and arabic numerals), etc. see rubric
     Need to handle multiple titles no quotes
-    (2) randomize request/confirm strings
-          confirmation strings should indicate like/dislike. ex: I liked ____ too! tell me about another movie. OR  glad you enjoyed ___. Anotha one.
-            -- sometimes more emotional than others depending on how much user liked it
-            -- strategy: define a bunch of lists of strings that can be formatted. See reactToMovies() superPositivePhrases as an example
-            -- refactor to build response instead of printing reactions. this means using += with response and not overwriting it later
-
+    Detect and respond to emotions
 """
 
 
@@ -82,7 +78,8 @@ class Chatbot:
 
     global DEBUG, yes, no, negationWords, contrastConjunctions, personalOpinionWords, superWords, containsIntensifier, MIN_REQUEST_THRESHOLD, intensifierWords, \
       superPositivePhrases, superNegativePhrases, positivePhrases, negativePhrases, additionalRequests, initialRequests, greetings, goodbyes, tellMeMoreRequests, \
-      anotherRecOrRefinePrompts, exitResponses, noMovieDetectedResponses, lastRecResponses, cantRecommendMovieResponses, enterNumBelowResponses, disambiguateMovieResponses
+      anotherRecOrRefinePrompts, exitResponses, noMovieDetectedResponses, lastRecResponses, cantRecommendMovieResponses, enterNumBelowResponses, disambiguateMovieResponses, \
+      angerWords, sadWords, generalReponses
     DEBUG = False
     yes = ['yes', 'ye', 'y', 'sure']
     no = ['no', 'n', 'nah']
@@ -92,6 +89,10 @@ class Chatbot:
     superWords = ['love', 'hate', 'favorite', 'worst', 'awful', 'fantastic', 'amazing', 'beautiful']
     personalOpinionWords = ['I', 'i']
     MIN_REQUEST_THRESHOLD = 2
+    angerWords['angry', 'anger', 'hate', 'mad']
+    sadWords['sad', 'sadden', 'saddened', 'unhappy', 'depressed']
+    movieMatchesEmpty = True
+
 
     superPositivePhrases = ['I agree {} is an unbelievable movie!! ',
                             'Yeah, {} was absolutely fantastic! ',
@@ -109,7 +110,7 @@ class Chatbot:
                           'Can you tell me about another movie? ',
                           'MORE! Whats another movie you liked/disliked? ']
     initialRequests = ['Please tell me about a movie you liked or didn\'t like. ',
-                       'Okay tell me about a movie you either liked or didn\'t like. ',
+                       'Tell me about a movie you either liked or didn\'t like. ',
                        'What\'s a movie you liked or didn\'t like? ']
     greetings = ['Suh dude.',
                  'Haiiiiiiiiii',
@@ -149,7 +150,15 @@ class Chatbot:
     disambiguateMovieResponses = ['Wasn\'t quite sure which movie you meant. Which of the below did you mean?',
                                   'Not quite sure which movie you\'re talking about. Which of the below did you mean?',
                                   'Hey, I actually don\'t know which movie you\'re referring to. Which of the below did you mean?']
-
+    generalReponses = ['Thats an odd thing to say. Why don\'t you use me for what I\'m designed to do and tell me about a movie.',
+                       'I suspect that you have forgotten my true purpose... Maybe try not being weird and tell me about a movie.',
+                       'Bro you\'re kind of cramping my style. Let\'s try this. Tell me about the last movie you saw.',
+                       'I don\'t think even a human would understand how you want me to respond... movie?',
+                       'Ummm thats nice. Why don\'t you tell me about a movie?',
+                       'No stop it. I\'m here to recommend movies not deal with your inability to understand directions.',
+                       'Stop. Take a second to think about who you\'re talking to. Thats right. A computer. Now tell me about a movie.',
+                       'Yeah thats great... Seen any good movies lately?',
+                       'Okay. We could do this all day. Why don\'t you just tell me about a movie.']
     #############################################################################
     # `moviebot` is the default chatbot. Change it to your chatbot's name       #
     #############################################################################
@@ -239,9 +248,13 @@ class Chatbot:
           self.updateSentimentDict(input)
           response += self.reactToMovies()
 
-        if self.faultyInput():
-          # TODO -- gracefully handle
-          return '<>'
+        # if self.faultyInput():
+        #   # TODO -- gracefully handle
+        #   return '<>'
+
+        if movieMatchesEmpty:
+            return self.respondFaultyInput(input)
+
 
         if len(self.userPreferencesMap) < MIN_REQUEST_THRESHOLD:
             response += self.notEnoughData()
@@ -264,9 +277,20 @@ class Chatbot:
         return response
 
 
-    # TODO
-    def faultyInput(self):
-      return False
+    def respondFaultyInput(self, input) :
+        if not set(input.split()).isdisjoint(angerWords):
+            response = 'I\'m sorry that you\'re angry. If it helps you calm down, '
+            response += initialRequests[randint(0, len(initialRequests)-1)].lower()
+        elif not set(input.split()).isdisjoint(sadWords):
+            response = 'I\'m sorry that you\'re sad. If it makes you feel any better, '
+            response += initialRequests[randint(0, len(initialRequests)-1)].lower()
+        else:
+            response = generalReponses[randint(0, len(generalReponses)-1)]
+        return response
+
+    # # TODO
+    # def faultyInput(self):
+    #   return False
 
     # Takes all titles in quotes and returns a dict of them to a list of their
     # possible matches. If no exact matches exist, looks for substrings
@@ -282,6 +306,8 @@ class Chatbot:
         if DEBUG:
             print "movieMatches:"
             print movieMatches
+        if movieMatches:
+            movieMatchesEmpty = False
         return movieMatches
 
     #For each possible title entered, returns list of possible matches inlcuding substring matches
