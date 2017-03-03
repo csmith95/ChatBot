@@ -578,7 +578,7 @@ class Chatbot:
         if result < -6:
           return -2
 
-        print result
+        # print result
         return -1 if result <= 0 else 1    # err on side of negative review so that ellipsis shit works
 
     def nonTitleWords(self, input):
