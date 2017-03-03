@@ -814,12 +814,9 @@ class Chatbot:
     def disambiguate(self, input):
       if self.disambiguationInProgress:
         try:
-          print input.strip()
           input = re.sub('"', '', input.strip())
           index = int(input)-1    # since indices shown to user are incremented by 1
-          print 'index: ', index
           movie = self.candidateMovies[index]
-          print 'movie: ', movie
           if self.cachedSentiment == 0:
             self.cachedSentiment = 1         # cop out -- for now, if ambiguous sentiment is with ambigous title, just assume positive
           self.disambiguationInProgress = False
