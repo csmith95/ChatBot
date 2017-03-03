@@ -418,7 +418,7 @@ class Chatbot:
 
     def popRecommendation(self) :
         if not self.recommendations:
-          return
+          return ''
         rec = self.recommendations.pop(0)
         title = self.fixDanglingArticle(self.titleDict[rec][0])
         self.givenRecommendations.add(rec)
