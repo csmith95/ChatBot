@@ -126,12 +126,12 @@ class Chatbot:
     goodbyes = ['See ya in a while crocodile :*',
                 'Catch ya later alligator ;)',
                 'Adios muchacho.']
-    tellMeMoreRequests = [' :(  Please tell me a little more.\n',
-                          ' Do you mind telling me a little more?\n',
-                          ' How do you feel about that movie?\n']
-    anotherRecOrRefinePrompts = ['Would you like another movie recommendation? Optionally, tell me about another movie!\n',
-                                 'Do you want another recommendation? You can also tell me about another movie.\n',
-                                 'Should I give you another recommendation? If you want, you can tell me about another movie.\n']
+    tellMeMoreRequests = [' :(  Please tell me a little more.',
+                          ' Do you mind telling me a little more?',
+                          ' How do you feel about that movie?']
+    anotherRecOrRefinePrompts = ['Would you like another movie recommendation? Optionally, tell me about another movie!',
+                                 'Do you want another recommendation? You can also tell me about another movie.',
+                                 'Should I give you another recommendation? If you want, you can tell me about another movie.']
     exitResponses = ['Guess we\'re done here. Enter \':quit\' to exit!',
                      'Okay then! Enter \':quit\' to exit!',
                      'Fine, leave me then! Enter \':quit\' to exit!']
@@ -182,7 +182,7 @@ class Chatbot:
       self.state = State.NEED_INFO
       self.givenRecommendations = set() # list of previously given recs not to be repeated
       self.recommendations = [] # list of top 5 movie rec IDs
-      self.pendingMovies = set()
+      self.pendingMovie = None
       self.stemSpecialWords()
       self.shouldGenerateReq = False
       self.firstRec = True
@@ -234,6 +234,10 @@ class Chatbot:
             self.mode = '(creative) '
         response = self.mode
 
+        if self.pendingMovie and 'it' in input.lower().split():
+          input = re.sub('it', '"{}"'.format(self.pendingMovie[1]), input)
+          self.pendingMovie = None
+
         input = self.searchNoQuotes(input) #In case no quotes used around potential title, searches for substring, adds quotes
         disambiguationResponse = self.disambiguate(input)
         if disambiguationResponse:
@@ -243,9 +247,8 @@ class Chatbot:
 
         # *** any code below here can assume disambiguation has been resolved ***
 
-        pendingMovies = self.fetchPendingMovieTitlesString()
-        if pendingMovies:
-          response = "I couldn't quite tell how you feel about " + pendingMovies
+        if self.pendingMovie:
+          response = "I can't quite tell what you thought about {}.".format(self.pendingMovie)
           response += tellMeMoreRequests[randint(0, len(tellMeMoreRequests)-1)]
           return response
 
@@ -253,11 +256,14 @@ class Chatbot:
         if extractedMovies:
           self.updateSentimentDict(input)
           response += self.reactToMovies()
+          if self.pendingMovie:
+            response += "I can't quite tell what you thought about {}.".format(self.pendingMovie[1])
+            response += tellMeMoreRequests[randint(0, len(tellMeMoreRequests)-1)]
+            return response
 
         if movieMatchesEmpty and not self.disambiguationJustResolved:
             return self.respondFaultyInput(input)
         self.disambiguationJustResolved = False
-
 
 
         if self.preferencesRecorded < 3:
@@ -348,21 +354,7 @@ class Chatbot:
       self.recentReviews = {}   # reset dictionary
 
       reaction = ''.join(phrases)
-      return reaction
-
-    # takes any movies that have been mentioned by user w/ neutral sentiment
-    # and combines them into a string of the form A, B, C, . . . , or X.
-    # works for any number of pending movies
-    def fetchPendingMovieTitlesString(self):
-      result = [self.titleDict[ID][0] for ID in self.pendingMovies]
-      if not result:
-        return result
-      movieString = ', '.join(result)
-      if len(result) > 1:
-        index =  len(movieString) - len(result[-1])
-        index2 = len(result[-1])
-        movieString = movieString[:index] + 'or ' + movieString[-index2:]
-      return movieString
+      return reaction      
 
     def handleInputIssues(self, inputtedMoviesInfo) :
         if len(inputtedMoviesInfo) == 0: #user enters no movie titles in quotes
@@ -601,10 +593,11 @@ class Chatbot:
         for id, title in self.titleDict.iteritems():
           if self.matchesTitle(title[0], inputTitle, substringSearch=False):
             if sentiment == 0:
-              self.pendingMovies.add(id)
+              self.pendingMovie = (id, self.fixDanglingArticle(title[0]))
+              print self.pendingMovie
             else:
-              if id in self.pendingMovies:      # update set of movie IDs our bot is confused about
-                self.pendingMovies.remove(id)
+              if self.pendingMovie and id == self.pendingMovie[0]:      # update set of movie IDs our bot is confused about
+                self.pendingMovie = None
               self.recentReviews[title[0]] = sentiment    # record -2, -1, 1, or 2 so bot can confirm classification w/ user inside reactToMovies()
               self.preferencesRecorded += 1 if self.userPreferencesVector[id] == 0 else 0   # increment if movie hasn't been rated by user yet
               self.userPreferencesVector[id] = sentiment / abs(sentiment)
@@ -742,15 +735,17 @@ class Chatbot:
       collaborative filtering"""
 
       neighborMoviesMap = {id : ratings for id, ratings in enumerate(self.ratings) if self.userPreferencesVector[id] != 0}
-      unratedMovies = {id : ratings for id, ratings in enumerate(self.ratings) if self.userPreferencesVector[id] == 0}
+      unratedMovies = {id : ratings for id, ratings in enumerate(self.ratings) if self.userPreferencesVector[id] == 0 and id not in self.givenRecommendations}
       extrapolatedRatings = {}
       for unratedID, ratings in unratedMovies.iteritems():
         simMap = {id : self.sim(ratings, ratingVector) for id, ratingVector in neighborMoviesMap.iteritems()}
-        extrapolatedRatings[unratedID] = sum(self.userPreferencesVector[id]*weight for id, weight in simMap.iteritems()) # weighted sum
+        rating = sum(self.userPreferencesVector[id]*weight for id, weight in simMap.iteritems()) # weighted sum
+        if rating > .6:
+          print 'added ', rating
+          extrapolatedRatings[unratedID] = rating
 
       topRatings = [id for id, rating in sorted(extrapolatedRatings.iteritems(), key=lambda x:x[1], reverse=True)][:5]
       return topRatings
-
 
 
     #############################################################################
@@ -806,7 +801,6 @@ class Chatbot:
           self.userPreferencesVector[movie[1]] = self.cachedSentiment / abs(self.cachedSentiment)    # since we only want to store -1/1 for recommendations instead of the [-2, 2] scale
           return ''
         except:
-          print 'err'
           return enterNumBelowResponses[randint(0,len(enterNumBelowResponses)-1)] + self.getMatchingMovieOptions()
 
 
