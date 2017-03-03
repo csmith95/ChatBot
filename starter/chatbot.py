@@ -52,7 +52,6 @@ if bot doesn't recognize title, rubric says "use fake title"...? wtf is this
         -- item-based collaborative filtering
   (2) identify/respond to 2 emotions
   (3) respond to arbitrary input
->>>>>>> recs work but slow
         -- add to faultyInput() method
         -- careful not to include emotion, asking for rec, or giving movie (w or w/o quotes) as arbitrary input because those require specific responses
 
@@ -71,21 +70,9 @@ if bot doesn't recognize title, rubric says "use fake title"...? wtf is this
 ** TJ **
     disambiguation by year, # in series (roman, normal, and arabic numerals), etc. see rubric
     Need to handle multiple titles no quotes
-<<<<<<< HEAD
     Detect and respond to NEGATION of emotions
-=======
-    Detect and respond to emotions
-    PROBLEMS:
-        if ambiguous title entered, all matches added to sentiment dict
-            #Example "fast and the furious" matches two movies and thus both are entered into sentiment dict incorrectly
-
-    randomize request/confirm strings
-        confirmation strings should indicate like/dislike. ex: I liked ____ too! tell me about another movie. OR  glad you enjoyed ___. Anotha one.
-          -- sometimes more emotional than others depending on how much user liked it
-          -- strategy: define a bunch of lists of strings that can be formatted. See reactToMovies() superPositivePhrases as an example
-
-
->>>>>>> master
+    big short, the
+    "1" matches to 187
 """
 
 
@@ -689,14 +676,14 @@ class Chatbot:
                         return True
                     try:
                         num = int(fixedTitle[len(fixedTitle) - 8])
-                        if fixedTitle[:-9] == inputTitle:
+                        if fixedTitle[:-9] == inputTitle and len(fixedTitle) > 11:
                             return True
                     except:
                         return False
                 else:
                     try:
                         num = int(fixedTitle[:-1])
-                        if fixedTitle[:-2] == inputTitle:
+                        if fixedTitle[:-2] == inputTitle and len(fixedTitle) > 4:
                             return True
                     except:
                         return False
