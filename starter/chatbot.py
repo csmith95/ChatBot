@@ -164,8 +164,8 @@ class Chatbot:
                        'Okay. We could do this all day. Why don\'t you just tell me about a movie.']
     recStrings = ['I bet you would dig "{}"',
                   'You should for sure watch "{}"',
-                  'Sounds like you would love {}',
-                  'Watch "{}". I\'ll be here when you come back to hear what you thought']
+                  'Sounds like you would love "{}"',
+                  'Watch "{}". I\'ll be here when you come back to hear what you thought!']
     #############################################################################
     # `moviebot` is the default chatbot. Change it to your chatbot's name       #
     #############################################################################
@@ -284,7 +284,7 @@ class Chatbot:
             return self.respondFaultyInput(input)
         self.disambiguationJustResolved = False
 
-        if self.preferencesRecorded < 3:
+        if self.preferencesRecorded < 5:
             response += self.notEnoughData()
         else:
             self.shouldShowReq = (self.firstRec or self.affirmative(input)) and self.freshRecs()
@@ -421,7 +421,6 @@ class Chatbot:
         rec = self.recommendations.pop(0)
         title = self.fixDanglingArticle(self.titleDict[rec][0])
         self.givenRecommendations.add(rec)
-        '\n\n I recommend "{}"'
         return color.BOLD + '\n\n' + recStrings[randint(0, len(recStrings))-1].format(title) + color.END + '\n\n'
 
     # slightly more robust at detecting "Yes"
