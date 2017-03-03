@@ -83,7 +83,7 @@ class Chatbot:
     global DEBUG, yes, no, negationWords, contrastConjunctions, personalOpinionWords, superWords, containsIntensifier, MIN_REQUEST_THRESHOLD, intensifierWords, \
       superPositivePhrases, superNegativePhrases, positivePhrases, negativePhrases, additionalRequests, initialRequests, greetings, goodbyes, tellMeMoreRequests, \
       anotherRecOrRefinePrompts, exitResponses, noMovieDetectedResponses, lastRecResponses, cantRecommendMovieResponses, enterNumBelowResponses, disambiguateMovieResponses, \
-      angryWords, happyWords, generalReponses, movieMatchesEmpty, helloWords, fillerWords
+      angryWords, happyWords, generalReponses, movieMatchesEmpty, helloWords, fillerWords, recStrings
     DEBUG = False
     yes = ['yes', 'ye', 'y', 'sure']
     no = ['no', 'n', 'nah']
@@ -162,6 +162,10 @@ class Chatbot:
                        'Stop. Take a second to think about who you\'re talking to. Thats right. A computer. Now tell me about a movie.',
                        'Yeah thats great... Seen any good movies lately?',
                        'Okay. We could do this all day. Why don\'t you just tell me about a movie.']
+    recStrings = ['I bet you would dig "{}"',
+                  'You should for sure watch "{}"',
+                  'Sounds like you would love {}',
+                  'Watch "{}". I\'ll be here when you come back to hear what you thought']
     #############################################################################
     # `moviebot` is the default chatbot. Change it to your chatbot's name       #
     #############################################################################
@@ -224,7 +228,7 @@ class Chatbot:
 
     def handleQuestions(self, input):
       input = input.lower()
-      if input.startswith('can you'):
+      if input.startswith('can'):
         split = input.split()
         if 'rec' in split or 'recommendation' in split or 'recommend' in split:
           return 'GIVE_REC'
@@ -283,8 +287,7 @@ class Chatbot:
         if self.preferencesRecorded < 3:
             response += self.notEnoughData()
         else:
-            self.shouldShowReq = (self.firstRec or self.affirmative(input) or extractedMovies) and self.freshRecs()
-            # print self.shouldShowReq
+            self.shouldShowReq = (self.firstRec or self.affirmative(input)) and self.freshRecs()
             if self.shouldShowReq:
                 # display good recommendation. Prompt for another movie rating or another recommendation
                 response += self.popRecommendation()
@@ -292,7 +295,7 @@ class Chatbot:
                 self.shouldShowReq = False
                 self.firstRec = False
             else:
-                if self.negative(input):
+                if self.negative(input) and not extractedMovies:
                   return exitResponses[randint(0,len(exitResponses)-1)]
                 # couldn't get good recommendation -- ask for more
                 response += self.promptUserPreRec(input)
@@ -359,7 +362,6 @@ class Chatbot:
             for title in titles:
                 movieMatches[title] = self.returnMatches(title)
         if DEBUG:
-            print "movieMatches:"
             print movieMatches
         if movieMatches:
             movieMatchesEmpty = False
@@ -413,33 +415,33 @@ class Chatbot:
             request = initialRequests[randint(0, len(initialRequests)-1)]
         return request
 
-
     def popRecommendation(self) :
         if not self.recommendations:
           return ''
         rec = self.recommendations.pop(0)
         title = self.fixDanglingArticle(self.titleDict[rec][0])
         self.givenRecommendations.add(rec)
-        return color.BOLD + '\n\nI recommend \'' + title + '\'' + color.END + '\n\n'
+        '\n\n I recommend "{}"'
+        return color.BOLD + '\n\n' + recStrings[randint(0, len(recStrings))-1].format(title) + color.END + '\n\n'
 
     # slightly more robust at detecting "Yes"
     def affirmative(self, input):
       if not input:
         return False
-      token = input[0].lower()
+      token = input.split()[0].lower()
       return token in yes
 
     # slightly more robust at detecting "No"
     def negative(self, input):
       if not input:
         return False
-      token = input[0].lower()
+      token = input.split()[0].lower()
       return token in no
 
     def promptUserPreRec(self, input) :
 
-        if self.affirmative(input) and len(self.recommendations) == 0:
-          return lastRecResponses[randint(0,len(lastRecResponses)-1)]
+        if len(self.recommendations) > 0:
+          return anotherRecOrRefinePrompts[randint(0,len(anotherRecOrRefinePrompts))-1]
 
         return cantRecommendMovieResponses[randint(0,len(cantRecommendMovieResponses)-1)]
 
@@ -638,7 +640,6 @@ class Chatbot:
           if self.matchesTitle(title[0], inputTitle, substringSearch=False):
             if sentiment == 0:
               self.pendingMovie = (id, self.fixDanglingArticle(title[0]))
-              print self.pendingMovie
             else:
               if self.pendingMovie and id == self.pendingMovie[0]:      # update set of movie IDs our bot is confused about
                 self.pendingMovie = None
@@ -778,8 +779,6 @@ class Chatbot:
       self.ratings[np.where(self.ratings >= 2.5)] = -2
       self.ratings[np.where(self.ratings >= 0.5)] = -1
       self.ratings[np.where(self.ratings == -2)] = 1
-      # print self.ratings[0]  # note that self.ratings[0] gives binarized ratings for first MOVIE
-
 
     def sim(self, u, v):
       return np.dot(u, v) / (np.sqrt(np.dot(u, u)) * np.sqrt(np.dot(v, v)))
@@ -818,12 +817,20 @@ class Chatbot:
     # 5. Write a description for your chatbot here!                             #
     #############################################################################
     def intro(self):
-      return """
-      Your task is to implement the chatbot as detailed in the PA6 instructions.
-      Remember: in the starter mode, movie names will come in quotation marks and
-      expressions of sentiment will be simple!
-      Write here the description for your own chatbot!
-      """
+
+      return "  Meet Rudolfa! Rudolfa is always runnig in creative mode and can do things like: \n\n" + \
+                "\t * identify movies without quotations or capitalization\n" + \
+                "\t * fine-grained sentiment extraction involving strong emotion words and intesifiers. I respond differently if you really love/hate something. Even try this with multiple movies.\n" + \
+                "\t * disambiguate movie titles for series and year ambiguities\n" + \
+                "\t * extract sentiment with multiple-movie input, including opposite sentiments \n" + \
+                "\t * identify and respond to 2 types of emotion (angry/upset and happy/excited) \n" + \
+                "\t * understand references to things said previous, like in the Titanic example on the rubric \n" + \
+                "\t * respond to arbitrary input to steer the conversation back to movies\n" + \
+                "\t * speak pretty fluently \n" + \
+                "\t * respond to questions of the form 'Can/How/What ...'? Try asking me for a recommendation!  \n" + \
+                "\t * recognize alternate titles \n\n" + \
+                "  Enjoy!!\n"
+
 
 
     #############################################################################
@@ -839,6 +846,7 @@ class Chatbot:
     def loadData(self):
       self.titles, self.ratings = ratings()
       self.userPreferencesVector = np.zeros(len(self.titles))
+      np.seterr(all='ignore')
 
     def disambiguate(self, input):
       if self.disambiguationInProgress:
