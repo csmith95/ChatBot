@@ -68,11 +68,12 @@ if bot doesn't recognize title, rubric says "use fake title"...? wtf is this
     handles basic emotions
     "1" matches to 187
     i like "the matrix" vs i like the "matrix". --> no quotes works
+    Not finding title without quotes if immediately followed by punctuation
+    asks me if i want another rec and it responds to yes or no with a generalResponse
 
 
 ** TJ **
     disambiguation by year, # in series (roman, normal, and arabic numerals), etc. see rubric
-
 """
 
 
@@ -278,7 +279,7 @@ class Chatbot:
             response += 'How did you feel about "{}"?'.format(self.fixDanglingArticle(self.pendingMovie[1]))
             return response
 
-        if movieMatchesEmpty and not self.disambiguationJustResolved:
+        if movieMatchesEmpty and not self.disambiguationJustResolved and not self.affirmative(input) and not self.negative(input):
             return self.respondFaultyInput(input)
         self.disambiguationJustResolved = False
 
@@ -286,7 +287,7 @@ class Chatbot:
             response += self.notEnoughData()
         else:
             self.shouldShowReq = (self.firstRec or self.affirmative(input) or extractedMovies) and self.freshRecs()
-            print self.shouldShowReq
+            # print self.shouldShowReq
             if self.shouldShowReq:
                 # display good recommendation. Prompt for another movie rating or another recommendation
                 response += self.popRecommendation()
@@ -298,8 +299,8 @@ class Chatbot:
                   return exitResponses[randint(0,len(exitResponses)-1)]
                 # couldn't get good recommendation -- ask for more
                 response += self.promptUserPreRec(input)
-
-        print 'Number of prefs recorded: ', self.preferencesRecorded
+        if DEBUG:
+            print 'Number of prefs recorded: ', self.preferencesRecorded
         return response
 
 
@@ -422,7 +423,7 @@ class Chatbot:
         rec = self.recommendations.pop(0)
         title = self.fixDanglingArticle(self.titleDict[rec][0])
         self.givenRecommendations.add(rec)
-        return color.BOLD + '\nI recommend \'' + title + '\'' + color.END + '\n'
+        return color.BOLD + '\n\nI recommend \'' + title + '\'' + color.END + '\n\n'
 
     # slightly more robust at detecting "Yes"
     def affirmative(self, input):
@@ -709,9 +710,15 @@ class Chatbot:
                         return True
                 if fixedTitle == inputTitle:
                     return True
+                punctuation = '.,!?'
                 if len(year) == 6:
                     if fixedTitle[:-7] == inputTitle:
                         return True
+                    #changes
+                    if inputTitle[len(inputTitle) - 1] in punctuation:
+                        if fixedTitle[:-7] == inputTitle[:-1]:
+                             return True
+                    #
                     try:
                         num = int(fixedTitle[len(fixedTitle) - 8])
                         if fixedTitle[:-9] == inputTitle and len(fixedTitle) > 11:
@@ -719,6 +726,11 @@ class Chatbot:
                     except:
                         continue
                 else:
+                    #changes
+                    if inputTitle[len(inputTitle) - 1] in punctuation:
+                        if fixedTitle == inputTitle[:-1]:
+                             return True
+                    #
                     try:
                         num = int(fixedTitle[:-1])
                         if fixedTitle[:-2] == inputTitle and len(fixedTitle) > 4:
