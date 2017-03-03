@@ -66,13 +66,14 @@ if bot doesn't recognize title, rubric says "use fake title"...? wtf is this
     toy story disambiguation
     (2) randomize request/confirm strings
     handles basic emotions
+    "1" matches to 187
 
 ** TJ **
     disambiguation by year, # in series (roman, normal, and arabic numerals), etc. see rubric
     Need to handle multiple titles no quotes
     Detect and respond to NEGATION of emotions
-    big short, the
-    "1" matches to 187
+    i like "the matrix" vs i like the matrix. --> no quotes works
+
 """
 
 
