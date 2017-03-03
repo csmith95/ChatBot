@@ -20,12 +20,12 @@ def ratings(src_filename='data/ratings.txt', delimiter='%', header=False, quotin
 	            user_id_set.add(user_id)
 	num_users = len(user_id_set)
 	num_movies = len(title_list)
+	mat = np.zeros((num_movies, num_users))
 
-	users = collections.defaultdict(lambda: {})  # mat = np.zeros((num_movies, num_users))
 	reader = csv.reader(file(src_filename), delimiter=delimiter, quoting=quoting)
 	for line in reader:
-		users[int(line[0])][int(line[1])] =  float(line[2]) # mat[int(line[1])][int(line[0])] = float(line[2])
-	return title_list, users  # mat
+		mat[int(line[1])][int(line[0])] = float(line[2])
+	return title_list, mat
 
 def titles(src_filename='data/movies.txt', delimiter='%', header=False, quoting=csv.QUOTE_MINIMAL):
 	reader = csv.reader(file(src_filename), delimiter=delimiter, quoting=quoting)
