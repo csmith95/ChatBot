@@ -79,7 +79,7 @@ class Chatbot:
     global DEBUG, yes, no, negationWords, contrastConjunctions, personalOpinionWords, superWords, containsIntensifier, MIN_REQUEST_THRESHOLD, intensifierWords, \
       superPositivePhrases, superNegativePhrases, positivePhrases, negativePhrases, additionalRequests, initialRequests, greetings, goodbyes, tellMeMoreRequests, \
       anotherRecOrRefinePrompts, exitResponses, noMovieDetectedResponses, lastRecResponses, cantRecommendMovieResponses, enterNumBelowResponses, disambiguateMovieResponses, \
-      angerWords, sadWords, generalReponses
+      angerWords, sadWords, happyWords, generalReponses, movieMatchesEmpty, helloWords
     DEBUG = False
     yes = ['yes', 'ye', 'y', 'sure']
     no = ['no', 'n', 'nah']
@@ -89,8 +89,10 @@ class Chatbot:
     superWords = ['love', 'hate', 'favorite', 'worst', 'awful', 'fantastic', 'amazing', 'beautiful']
     personalOpinionWords = ['I', 'i']
     MIN_REQUEST_THRESHOLD = 2
-    angerWords['angry', 'anger', 'hate', 'mad']
-    sadWords['sad', 'sadden', 'saddened', 'unhappy', 'depressed']
+    angerWords = ['angry', 'anger', 'hate', 'mad', 'pissed', 'annoyed', 'bitter', 'enraged', 'furious', 'heated', 'offended']
+    sadWords = ['sad', 'sadden', 'saddened', 'unhappy', 'depressed', 'dismal', 'heartbroken']
+    happyWords = ['happy', 'joyful', 'excited', 'delight', 'delighted', 'thrilled', 'pleased', 'glad', 'jubilant', 'cheerful']
+    helloWords = ['hey', 'hi', 'hello']
     movieMatchesEmpty = True
 
 
@@ -113,16 +115,13 @@ class Chatbot:
                        'Tell me about a movie you either liked or didn\'t like. ',
                        'What\'s a movie you liked or didn\'t like? ']
     greetings = ['Suh dude.',
-                 'Haiiiiiiiiii',
+                 'Heyyyyyyy',
                  'How\'s it hangin, big fellah?',
                  'Howdy, partner.',
-                 'Hola muchacho.',
-                 'Whats up, fucker.',
-                 'Yo, niqqqqqa.']
+                 'Hola muchacho.']
     goodbyes = ['See ya in a while crocodile :*',
                 'Catch ya later alligator ;)',
-                'Adios bitchacho.',
-                'Alright. Fuck off then.']
+                'Adios muchacho.']
     tellMeMoreRequests = [' :(  Please tell me a little more.\n',
                           ' Do you mind telling me a little more?\n',
                           ' How do you feel about that movie?\n']
@@ -248,10 +247,6 @@ class Chatbot:
           self.updateSentimentDict(input)
           response += self.reactToMovies()
 
-        # if self.faultyInput():
-        #   # TODO -- gracefully handle
-        #   return '<>'
-
         if movieMatchesEmpty:
             return self.respondFaultyInput(input)
 
@@ -278,19 +273,21 @@ class Chatbot:
 
 
     def respondFaultyInput(self, input) :
-        if not set(input.split()).isdisjoint(angerWords):
+        if not set(input.lower().split()).isdisjoint(angerWords):
             response = 'I\'m sorry that you\'re angry. If it helps you calm down, '
             response += initialRequests[randint(0, len(initialRequests)-1)].lower()
-        elif not set(input.split()).isdisjoint(sadWords):
+        elif not set(input.lower().split()).isdisjoint(sadWords):
             response = 'I\'m sorry that you\'re sad. If it makes you feel any better, '
+            response += initialRequests[randint(0, len(initialRequests)-1)].lower()
+        elif not set(input.lower().split()).isdisjoint(happyWords):
+            response = 'I\'m glad that you\'re happy. Since you\'re in such a good mood, '
+            response += initialRequests[randint(0, len(initialRequests)-1)].lower()
+        elif not set(input.lower().split()).isdisjoint(helloWords):
+            response = 'Um yeah, hello to you too. '
             response += initialRequests[randint(0, len(initialRequests)-1)].lower()
         else:
             response = generalReponses[randint(0, len(generalReponses)-1)]
         return response
-
-    # # TODO
-    # def faultyInput(self):
-    #   return False
 
     # Takes all titles in quotes and returns a dict of them to a list of their
     # possible matches. If no exact matches exist, looks for substrings
