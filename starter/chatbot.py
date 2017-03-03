@@ -488,11 +488,13 @@ class Chatbot:
             for i in range(0, len(tokens)):
                 testTitle = tokens[i]
                 if self.titleMatches(testTitle):
-                    matches.append(testTitle)
+                    if tokens[i-1].lower() != 'i' or i == len(tokens) - 1:
+                        matches.append(testTitle)
                 for j in range(i + 1, len(tokens)):
                     testTitle += ' ' + tokens[j]
                     if self.titleMatches(testTitle):
-                        matches.append(testTitle)
+                        if tokens[i-1].lower() != 'i' or j == len(tokens) - 1:
+                            matches.append(testTitle)
             if matches:
                 title = max(matches, key=len)
                 index = input.find(title, 0, len(input))
@@ -704,8 +706,9 @@ class Chatbot:
                 if fixedTitle.find('the ', 0, 6) == 0:
                     if fixedTitle[4:] == inputTitle:
                         return True
-                if fixedTitle == inputTitle:
-                    return True
+                    if len(year) == 6:
+                        if fixedTitle[4:-7] == inputTitle:
+                            return True
                 punctuation = '.,!?'
                 if len(year) == 6:
                     if fixedTitle[:-7] == inputTitle:
