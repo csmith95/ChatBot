@@ -65,11 +65,12 @@ if bot doesn't recognize title, rubric says "use fake title"...? wtf is this
     distininguishes positive inputs from highly positive inputs and same for negative -- bot gives stronger confirmation response
     toy story disambiguation
     (2) randomize request/confirm strings
+    handles basic emotions
 
 ** TJ **
     disambiguation by year, # in series (roman, normal, and arabic numerals), etc. see rubric
     Need to handle multiple titles no quotes
-    Detect and respond to emotions
+    Detect and respond to NEGATION of emotions
 """
 
 
