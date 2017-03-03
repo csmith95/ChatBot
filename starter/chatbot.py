@@ -291,7 +291,7 @@ class Chatbot:
         print inputTitle
         for id, title in enumerate(self.titleList):
           if self.matchesTitle(title, inputTitle, substringSearch=False):
-            matches.append((title, id, "EXACT"))
+            matches.append((title, id))
         if not matches: #no exact matches, looks for substring matches
           matches = self.substringMatches(inputTitle)
         return matches
@@ -403,7 +403,7 @@ class Chatbot:
         for index, listedTitle in enumerate(self.titleList):
             # for title in titles:
             if self.matchesTitle(listedTitle, inputTitle, substringSearch=True):
-                ambiguousMatches.append((listedTitle, index, "SUBSTRING"))
+                ambiguousMatches.append((listedTitle, index))
         return ambiguousMatches
 
     #If no titles in quotes, searches for the single longest substring that matches a title in the list
