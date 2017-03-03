@@ -50,11 +50,6 @@ if bot doesn't recognize title, rubric says "use fake title"...? wtf is this
   (1) refine recommendations
         -- clarify user-based approach
         -- item-based collaborative filtering
-  (2) randomize request/confirm strings
-        confirmation strings should indicate like/dislike. ex: I liked ____ too! tell me about another movie. OR  glad you enjoyed ___. Anotha one.
-          -- sometimes more emotional than others depending on how much user liked it
-          -- strategy: define a bunch of lists of strings that can be formatted. See reactToMovies() superPositivePhrases as an example
-          -- refactor to build response instead of printing reactions. this means using += with response and not overwriting it later
   (3) identify/respond to 2 emotions
   (4) respond to arbitrary input
         -- add to faultyInput() method
@@ -68,12 +63,16 @@ if bot doesn't recognize title, rubric says "use fake title"...? wtf is this
     searchNoQuotes identifies movies without quotations using single longest substring technique
         returns input with newly inserted quotes for title to be extracted as normal
     distininguishes positive inputs from highly positive inputs and same for negative -- bot gives stronger confirmation response
-
+    toy story disambiguation
 
 ** TJ **
     disambiguation by year, # in series (roman, normal, and arabic numerals), etc. see rubric
     Need to handle multiple titles no quotes
-
+    (2) randomize request/confirm strings
+          confirmation strings should indicate like/dislike. ex: I liked ____ too! tell me about another movie. OR  glad you enjoyed ___. Anotha one.
+            -- sometimes more emotional than others depending on how much user liked it
+            -- strategy: define a bunch of lists of strings that can be formatted. See reactToMovies() superPositivePhrases as an example
+            -- refactor to build response instead of printing reactions. this means using += with response and not overwriting it later
 
 """
 
@@ -82,7 +81,7 @@ class Chatbot:
     """Simple class to implement the chatbot for PA 6."""
 
     global DEBUG, yes, no, negationWords, contrastConjunctions, personalOpinionWords, superWords, containsIntensifier, MIN_REQUEST_THRESHOLD, intensifierWords, \
-      superPositivePhrases
+      superPositivePhrases, superNegativePhrases, positivePhrases, negativePhrases, additionalRequests, initialRequests
 
     DEBUG = False
     yes = ['yes', 'ye', 'y', 'sure']
@@ -93,7 +92,25 @@ class Chatbot:
     superWords = ['love', 'hate', 'favorite', 'worst', 'awful', 'fantastic', 'amazing', 'beautiful']
     personalOpinionWords = ['I', 'i']
     MIN_REQUEST_THRESHOLD = 2
-    superPositivePhrases = ['I agree {} is an unbelievable movie!! \n']
+    superPositivePhrases = ['I agree {} is an unbelievable movie!! ',
+                            'Yeah, {} was absolutely fantastic! ',
+                            'You\'re so right. {} was definitely a great movie! ']
+    superNegativePhrases = ['Damn, sorry to hear how much you hated {} :( ',
+                            'Thats really too bad you didn\'t like {} :( ',
+                            'Wow, yeah I can understand why you hated {}! ']
+    positivePhrases = ['Glad you enjoyed {}. ',
+                       'Yeah, {} was pretty good. ',
+                       'I also thought {} was a good movie. ']
+    negativePhrases = ['A lot of people agree {} was kinda lame. ',
+                       'Yeah, {} wasn\'t great. ',
+                       'Agreed. {} could have been better. ']
+    additionalRequests = ['Tell me about another one. ',
+                          'Can you tell me about another movie? ',
+                          'MORE! Whats another movie you liked/disliked? ']
+    initialRequests = ['Please tell me about a movie you liked or didn\'t like. ',
+                       'Okay tell me about a movie you either liked or didn\'t like. ',
+                       'What\'s a movie you liked or didn\'t like? ']
+
 
     #############################################################################
     # `moviebot` is the default chatbot. Change it to your chatbot's name       #
@@ -190,8 +207,7 @@ class Chatbot:
         """
         if self.is_turbo == True:
             self.mode = '(creative) '
-
-        response = ''
+        response = self.mode
 
         input = self.searchNoQuotes(input) #In case no quotes used around potential title, searches for substring, adds quotes
         disambiguationResponse = self.disambiguate(input)
@@ -276,13 +292,13 @@ class Chatbot:
       for title, sentiment in self.recentReviews.iteritems():
         title = '"' + re.sub(r'\s\([0-9]*\)', '', title) + '"'
         if sentiment == -2:
-          phrase = 'Damn, sorry to hear how much you hated {} :( \n'
+          phrase = superNegativePhrases[randint(0, len(superNegativePhrases)-1)]
         if sentiment == 2:
           phrase = superPositivePhrases[randint(0, len(superPositivePhrases)-1)]
         if sentiment == 1:
-          phrase = 'Glad you enjoyed {}. \n'
+          phrase = positivePhrases[randint(0, len(positivePhrases)-1)]
         if sentiment == -1:
-          phrase = "A lot of people agree {} was kinda lame. \n".format(title)
+          phrase = negativePhrases[randint(0, len(negativePhrases)-1)]
         phrases += [phrase.format(title)]
 
       self.recentReviews = {}   # reset dictionary
@@ -312,12 +328,10 @@ class Chatbot:
 
 
     def notEnoughData(self) :
-        request = 'Anotha one.'
-        confirm = 'Dats coo. '
+        request = additionalRequests[randint(0, len(additionalRequests)-1)]
         if len(self.userPreferencesMap) == 0: # first movie from user
-            request = 'Please tell me about a movie you liked or didn\'t like.'
-            confirm = ''
-        return self.mode + confirm + request
+            request = initialRequests[randint(0, len(initialRequests)-1)]'
+        return request
 
 
     def popRecommendation(self) :
@@ -612,6 +626,8 @@ class Chatbot:
                     return True
                 if fixedTitle[:-7] == inputTitle:
                     return True
+                if fixedTitle[:-9] == inputTitle:
+                    return True
         return False
 
     #Returns list of [movie IDs, title, genre|genre]
@@ -662,7 +678,7 @@ class Chatbot:
 
   # item- based
     # binarize entire matrix by an arbitrary number (say, 3)
-    # 
+    #
 
     def recommend(self):
       """Generates a list of movies based on the input vector u using
