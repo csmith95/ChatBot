@@ -72,9 +72,7 @@ if bot doesn't recognize title, rubric says "use fake title"...? wtf is this
 
 ** TJ **
     disambiguation by year, # in series (roman, normal, and arabic numerals), etc. see rubric
-    PROBLEMS:
-        if ambiguous title entered, all matches added to sentiment dict
-            #Example "fast and the furious" matches two movies and thus both are entered into sentiment dict incorrectly
+    Need to handle multiple titles no quotes
 
 
 """
