@@ -1,2 +1,2 @@
 # ChatBot
-CS124 ChatBot Assignment
+Movie recommender & great pal
